@@ -1,0 +1,47 @@
+[gd_scene format=3 uid="uid://rq2pa5oxxsa1"]
+
+[ext_resource type="Script" uid="uid://s8h7e6g1q2ff" path="res://Scripts/GMDashboard.gd" id="1_rj5mt"]
+
+[node name="GMDashboard" type="CanvasLayer" unique_id=1538053333]
+script = ExtResource("1_rj5mt")
+
+[node name="HBoxContainer" type="HBoxContainer" parent="." unique_id=914772494]
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="LoadMapButton" type="Button" parent="HBoxContainer" unique_id=1737477210]
+layout_mode = 2
+text = "Load new map"
+
+[node name="MapDropdown" type="OptionButton" parent="HBoxContainer" unique_id=949035582]
+layout_mode = 2
+
+[node name="VSeparator" type="VSeparator" parent="HBoxContainer" unique_id=1262882304]
+layout_mode = 2
+
+[node name="LoadTokenArtButton" type="Button" parent="HBoxContainer" unique_id=1123379448]
+layout_mode = 2
+text = "Load Token"
+
+[node name="TokenDropdown" type="OptionButton" parent="HBoxContainer" unique_id=972361713]
+layout_mode = 2
+
+[node name="OffsetSpinBox" type="SpinBox" parent="HBoxContainer" unique_id=1520144766]
+layout_mode = 2
+min_value = -100.0
+
+[node name="EnemyCheckBox" type="CheckBox" parent="HBoxContainer" unique_id=848550990]
+layout_mode = 2
+
+[node name="SpawnTokenButton" type="Button" parent="HBoxContainer" unique_id=520939734]
+layout_mode = 2
+text = "Spawn Token"
+
+[node name="MapFileDialog" type="FileDialog" parent="." unique_id=1593283077]
+oversampling_override = 1.0
+title = "Open a File"
+file_mode = 0
+
+[node name="TokenFileDialog" type="FileDialog" parent="." unique_id=433992924]
+title = "Open a File"
+file_mode = 0

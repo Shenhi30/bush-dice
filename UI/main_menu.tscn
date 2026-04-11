@@ -1,0 +1,52 @@
+[gd_scene format=3 uid="uid://dumt7s8nlqnjf"]
+
+[ext_resource type="Script" uid="uid://bxm3g1gt4ul3x" path="res://Scripts/MainMenu.gd" id="1_p8ccj"]
+
+[node name="MainMenu" type="Control" unique_id=777171733]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_p8ccj")
+
+[node name="ColorRect" type="ColorRect" parent="." unique_id=616950100]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.3854925, 0.38549247, 0.38549247, 1)
+
+[node name="CenterContainer" type="CenterContainer" parent="." unique_id=1698054845]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="CenterContainer" unique_id=1160955503]
+layout_mode = 2
+
+[node name="TitleLabel" type="Label" parent="CenterContainer/VBoxContainer" unique_id=1996377064]
+layout_mode = 2
+text = "Bush Dice"
+
+[node name="NameInput" type="LineEdit" parent="CenterContainer/VBoxContainer" unique_id=525107508]
+layout_mode = 2
+placeholder_text = "Name"
+
+[node name="IPInput" type="LineEdit" parent="CenterContainer/VBoxContainer" unique_id=1712597953]
+layout_mode = 2
+placeholder_text = "Ip"
+
+[node name="HostButton" type="Button" parent="CenterContainer/VBoxContainer" unique_id=1341657758]
+layout_mode = 2
+text = "Host"
+
+[node name="JoinButton" type="Button" parent="CenterContainer/VBoxContainer" unique_id=193178422]
+layout_mode = 2
+text = "Join Ip"

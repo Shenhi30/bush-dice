@@ -1,0 +1,19 @@
+[gd_scene format=3 uid="uid://ccca1gwkeiu26"]
+
+[ext_resource type="Texture2D" uid="uid://brb3xjfgkvode" path="res://Assets/Maps/Continent west.jpg" id="1_legbf"]
+[ext_resource type="Script" uid="uid://d0graihgoocmq" path="res://Scripts/GameBoard.gd" id="1_s5vlf"]
+[ext_resource type="Script" uid="uid://ot0uea5lnjo8" path="res://Scripts/CameraControls.gd" id="2_s5vlf"]
+[ext_resource type="Script" uid="uid://b3x8hfopbgjdh" path="res://Scripts/GridOverlay.gd" id="3_nhcq1"]
+
+[node name="GameBoard" type="Node2D" unique_id=844144018]
+script = ExtResource("1_s5vlf")
+
+[node name="MapLayer" type="Sprite2D" parent="." unique_id=787774736]
+texture = ExtResource("1_legbf")
+centered = false
+
+[node name="GridOverlay" type="Node2D" parent="MapLayer" unique_id=784005013]
+script = ExtResource("3_nhcq1")
+
+[node name="GMCamera" type="Camera2D" parent="." unique_id=1574708758]
+script = ExtResource("2_s5vlf")

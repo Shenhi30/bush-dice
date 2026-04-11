@@ -1,0 +1,89 @@
+[gd_scene format=3 uid="uid://drlbrv55rl27a"]
+
+[ext_resource type="Script" uid="uid://de2qaghag40jj" path="res://Scripts/token.gd" id="1_w5to0"]
+[ext_resource type="Texture2D" uid="uid://bwdp363fbrbwx" path="res://Assets/Tokens/6662c45a04d674e152f8da8a-removebg-preview.png" id="2_ckhc0"]
+[ext_resource type="FontFile" uid="uid://dvpkfb7dbepkm" path="res://Assets/Fonts/Roboto-VariableFont_wdth,wght.ttf" id="3_ckhc0"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_w5to0"]
+size = Vector2(64, 64)
+
+[sub_resource type="LabelSettings" id="LabelSettings_ckhc0"]
+font = ExtResource("3_ckhc0")
+font_size = 4
+font_color = Color(0.251785, 0.5734781, 0, 1)
+outline_size = 2
+outline_color = Color(0, 0, 0, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ckhc0"]
+bg_color = Color(0, 0, 0, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_r58tj"]
+bg_color = Color(0, 0.64369816, 3.85046e-07, 1)
+
+[node name="Token" type="CharacterBody2D" unique_id=1895161753]
+input_pickable = true
+script = ExtResource("1_w5to0")
+
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=202584918]
+texture = ExtResource("2_ckhc0")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=55063732]
+shape = SubResource("RectangleShape2D_w5to0")
+
+[node name="UI" type="Control" parent="." unique_id=855113083]
+layout_mode = 3
+anchors_preset = 0
+offset_left = -10.0
+offset_top = -19.0
+offset_right = 366.0
+offset_bottom = 597.0
+mouse_filter = 2
+
+[node name="NameLabel" type="Label" parent="UI" unique_id=1798223895]
+layout_mode = 0
+offset_right = 100.0
+offset_bottom = 5.0
+theme_override_fonts/font = ExtResource("3_ckhc0")
+theme_override_font_sizes/font_size = 24
+text = "name"
+label_settings = SubResource("LabelSettings_ckhc0")
+horizontal_alignment = 1
+autowrap_mode = 1
+
+[node name="HPBar" type="ProgressBar" parent="UI" unique_id=1473046388]
+layout_mode = 0
+offset_right = 64.0
+offset_bottom = 10.0
+theme_override_styles/background = SubResource("StyleBoxFlat_ckhc0")
+theme_override_styles/fill = SubResource("StyleBoxFlat_r58tj")
+show_percentage = false
+
+[node name="TokenMenu" type="PanelContainer" parent="UI" unique_id=422365516]
+visible = false
+layout_mode = 0
+offset_left = 44.0
+offset_top = -15.0
+offset_right = 130.0
+offset_bottom = 52.0
+
+[node name="VBoxContainer" type="VBoxContainer" parent="UI/TokenMenu" unique_id=1464914678]
+layout_mode = 2
+
+[node name="AmountSpinBox" type="SpinBox" parent="UI/TokenMenu/VBoxContainer" unique_id=258814095]
+layout_mode = 2
+min_value = -9999.0
+max_value = 9999.0
+
+[node name="DamageBtn" type="Button" parent="UI/TokenMenu/VBoxContainer" unique_id=673431039]
+layout_mode = 2
+text = "Damage"
+
+[node name="HealBtn" type="Button" parent="UI/TokenMenu/VBoxContainer" unique_id=998393978]
+layout_mode = 2
+text = "Heal"
+
+[node name="LevelUpBtn" type="Button" parent="UI/TokenMenu/VBoxContainer" unique_id=894529489]
+layout_mode = 2
+text = "Level Up"
+
+[connection signal="input_event" from="." to="." method="_on_input_event"]

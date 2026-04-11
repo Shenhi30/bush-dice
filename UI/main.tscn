@@ -1,0 +1,22 @@
+[gd_scene format=3 uid="uid://2rw774jahmfr"]
+
+[ext_resource type="PackedScene" uid="uid://ccca1gwkeiu26" path="res://Scenes/game_board.tscn" id="1_emhnf"]
+[ext_resource type="Script" uid="uid://br88cg68ywjyj" path="res://Scripts/main.gd" id="1_uw6j2"]
+[ext_resource type="PackedScene" uid="uid://rq2pa5oxxsa1" path="res://Scenes/gm_dashboard.tscn" id="2_uw6j2"]
+[ext_resource type="PackedScene" uid="uid://drlbrv55rl27a" path="res://Scenes/token.tscn" id="4_dyfb5"]
+
+[node name="Main" type="Node" unique_id=1795128510]
+script = ExtResource("1_uw6j2")
+
+[node name="GameBoard" parent="." unique_id=844144018 instance=ExtResource("1_emhnf")]
+
+[node name="GMDashboard" parent="." unique_id=1538053333 instance=ExtResource("2_uw6j2")]
+
+[node name="Token" parent="." unique_id=1113702770 instance=ExtResource("4_dyfb5")]
+position = Vector2(302, 250)
+character_name = "Laura"
+is_enemy = true
+
+[node name="Token2" parent="." unique_id=837420156 instance=ExtResource("4_dyfb5")]
+position = Vector2(455, 249)
+character_name = "Test player"
