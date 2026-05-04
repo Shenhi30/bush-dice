@@ -2,7 +2,7 @@ extends Node2D
 
 # Configurable settings for your grid
 var grid_size: int = 64 # How many pixels wide/tall each square is
-var grid_color: Color = Color(0.463, 0.171, 0.545, 0.855) # White color with 30% opacity
+var grid_color: Color = Color(0.584, 0.125, 0.17, 0.555) # White color with 30% opacity
 var line_thickness: float = 2.0
 
 var map_size: Vector2 = Vector2.ZERO

@@ -1,73 +1,122 @@
 extends CharacterBody2D
 
-# --- STATS ---
+
+# --- STATS & STATE ---
 @export var character_name: String = "Unknown"
 @export var is_enemy: bool = false
 @export var max_hp: int = 20
 @export var current_hp: int = 20
-@export var initiative: int = 0
+var is_dead: bool = false
+var is_status_active: bool = false
+var current_status_color: Color = Color("c45500b2") # Default status
+var current_aura_radius: float = 0.0
+var current_aura_color: Color = Color(0.0, 1.0, 0.0, 0.2) 
+var name_color:Color = Color.WHITE
+var current_main_btns: Array = []
 
-# --- DISPLAY & SIZE SETTINGS ---
+var manual_stretch: Vector2 = Vector2(1.0, 1.0)
+var is_resizing: bool = false
+
+var art_path: String = ""
+var height_offset: float = 0.0
+
+# --- DISPLAY SETTINGS ---
 @export var grid_size_in_squares: int = 1 
 @export var is_standee: bool = false
 @export var label_y_offset: float = 0.0
 var base_cell_size: float = 64.0 
-@export var grid_offset: Vector2 = Vector2.ZERO
+@export var grid_offset: Vector2 = Vector2.ZERO 
 
-# --- MOVEMENT & STATE ---
+# --- MOVEMENT VARIABLES ---
 @export var move_speed: float = 300.0
 var dragging: bool = false
 var is_hovered: bool = false
 var is_selected: bool = false
 var drag_start_pos: Vector2 = Vector2.ZERO
 
-# --- UI REFERENCES ---
+# --- NODE REFERENCES ---
 @onready var name_label = $UI/NameLabel
 @onready var hp_bar = $UI/HPBar
 @onready var sprite = $Sprite2D
 @onready var collision_shape = $CollisionShape2D
+@onready var vision_light = $VisionLight
 
+
+@onready var highlight_ring = $HightLightRing
 # --- MENU REFERENCES ---
 @onready var token_menu = $UI/TokenMenu
-@onready var amount_spinbox = $UI/TokenMenu/VBoxContainer/AmountSpinBox
-@onready var damage_btn = $UI/TokenMenu/VBoxContainer/DamageBtn
-@onready var heal_btn = $UI/TokenMenu/VBoxContainer/HealBtn
-@onready var level_up_btn = $UI/TokenMenu/VBoxContainer/LevelUpBtn
+@onready var main_menu = $UI/TokenMenu/MainMenu
+@onready var hp_main_btn = $UI/TokenMenu/MainMenu/HPMainBtn
+@onready var hide_btn = $UI/TokenMenu/MainMenu/HideBtn
+@onready var status_btn = $UI/TokenMenu/MainMenu/StatusBtn
+@onready var aura_btn = $UI/TokenMenu/MainMenu/AuraBtn
+@onready var light_btn = $UI/TokenMenu/MainMenu/LightBtn
+@onready var state_btn = $UI/TokenMenu/MainMenu/StateBtn
+@onready var edit_btn = $UI/TokenMenu/MainMenu/EditBtn
+
+@onready var hp_action_menu = $UI/TokenMenu/HPActionMenu
+@onready var amount_spinbox = $UI/TokenMenu/HPActionMenu/AmountSpinBox
+@onready var damage_btn = $UI/TokenMenu/HPActionMenu/DamageBtn
+@onready var heal_btn = $UI/TokenMenu/HPActionMenu/HealBtn
+@onready var level_up_btn = $UI/TokenMenu/HPActionMenu/LevelUpBtn
+
+@onready var status_menu = $UI/TokenMenu/StatusMenu
+@onready var status_color_picker = $UI/TokenMenu/StatusMenu/StatusColorPicker
+@onready var clear_status_btn = $UI/TokenMenu/StatusMenu/ClearStatusBtn
+
+@onready var aura_menu = $UI/TokenMenu/AuraMenu
+@onready var aura_radius_spin = $UI/TokenMenu/AuraMenu/AuraRadiusSpinBox
+@onready var aura_color_picker = $UI/TokenMenu/AuraMenu/AuraColorPicker
+@onready var clear_aura_btn = $UI/TokenMenu/AuraMenu/ClearAuraBtn
+
+@onready var light_menu = $UI/TokenMenu/LightMenu
+@onready var light_radius_spin = $UI/TokenMenu/LightMenu/LightRadiusSpinBox
+@onready var clear_light_btn = $UI/TokenMenu/LightMenu/ClearLightBtn
+
+@onready var edit_menu = $UI/TokenMenu/EditMenu
+@onready var name_input = $UI/TokenMenu/EditMenu/NameInput
+@onready var base_color_picker = $UI/TokenMenu/EditMenu/BaseColorPicker
+@onready var close_edit_btn = $UI/TokenMenu/EditMenu/CloseEditBtn
+
+@onready var resize_handle = $UI/ResizeHandle
 
 func _ready():
-	# 1. Setup UI Values
 	name_label.text = character_name
+	name_label.modulate = name_color
 	hp_bar.max_value = max_hp
 	hp_bar.value = current_hp
 	
-	# 2. Setup Initial Visuals
-	update_enemy_status()
-	normalize_size()
+	update_visuals()
 	
-	# 3. Connect Signals
+	if art_path != "":
+		var new_texture = load(art_path)
+		if new_texture:
+			sprite.texture = new_texture
+			
+	# Apply the custom height offset we passed in from the dashboard
+	if height_offset != 0.0:
+		label_y_offset = height_offset
+	
+	normalize_size()
+	input_event.connect(_on_input_event) 
 	mouse_entered.connect(_on_mouse_entered)
 	mouse_exited.connect(_on_mouse_exited)
-	damage_btn.pressed.connect(_on_damage_pressed)
-	heal_btn.pressed.connect(_on_heal_pressed)
-	level_up_btn.pressed.connect(_on_level_up_pressed)
-
+	resize_handle.gui_input.connect(_on_resize_handle_input)
+	
+	_setup_menu_signals()
 
 # --- MOVEMENT (HYBRID DRAG + WASD) ---
 func _physics_process(_delta):
 	var is_moving = false
 
-	# 1. MOUSE DRAGGING (Highest Priority)
 	if dragging:
 		var target = get_global_mouse_position()
 		var distance = global_position.distance_to(target)
-		
-		# Prevent jittering when reaching the mouse
 		if distance > 5.0: 
 			velocity = global_position.direction_to(target) * distance * 15.0
 			move_and_slide()
 		is_moving = true
 
-	# 2. WASD KEYBOARD (Only if selected)
 	elif is_selected:
 		var input_dir = Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
 		if input_dir != Vector2.ZERO:
@@ -75,66 +124,63 @@ func _physics_process(_delta):
 			move_and_slide()
 			is_moving = true
 
-	# 3. STOPPING & GRID SNAPPING
 	if not is_moving and velocity != Vector2.ZERO:
 		velocity = Vector2.ZERO
-		snap_to_grid()
+		snap_to_grid(global_position)
 
-
-# By default, it uses its own position, but we can feed it the mouse position!
 func snap_to_grid(target_pos: Vector2 = global_position):
-	# 1. Apply the GM's custom grid offset
 	var current_x = target_pos.x - grid_offset.x
 	var current_y = target_pos.y - grid_offset.y
 	
-	# 2. Find the exact box based on the TARGET position (e.g., your mouse)
 	var snapped_x = floor(current_x / base_cell_size) * base_cell_size
 	var snapped_y = floor(current_y / base_cell_size) * base_cell_size
 	
-	# 3. Add the 32px center offset, plus the GM's custom offset
 	var center_offset = base_cell_size / 2.0
 	global_position = Vector2(snapped_x + center_offset, snapped_y + center_offset) + grid_offset
 
-
-# --- INPUT EVENT (CLICKING THE TOKEN) ---
+# --- INPUT LOGIC ---
 func _on_input_event(_viewport, event, _shape_idx):
 	if event is InputEventMouseButton:
-		# Left Click Down: Start Drag
+		
+		# 1. LEFT CLICK DOWN: Start Dragging
 		if event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
 			dragging = true
 			drag_start_pos = global_position 
 			
-		# Right Click Down: Open Menu
+		# 2. RIGHT CLICK DOWN: Open Menu (Only for the token you are touching!)
 		elif event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
 			token_menu.visible = !token_menu.visible
 			if token_menu.visible:
-				amount_spinbox.value = 0 
+				main_menu.visible = true
+				hp_action_menu.visible = false 
+				status_menu.visible = false
+				aura_menu.visible = false
+				light_menu.visible = false
+				edit_menu.visible = false
+				resize_handle.visible = false
+				amount_spinbox.value = 0
+				token_menu.sub_button_count = 0 
+				update_radial_menu()
 
-
-# --- GLOBAL INPUT (HOTKEYS & RELEASING CLICKS) ---
 func _input(event):
-	# 1. Releasing the Left Mouse Button anywhere on screen
+	# 1. GLOBAL LEFT CLICK UP: Stop Dragging
+	# (This MUST stay global so the token stops dragging even if your mouse moves off of it)
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if not event.pressed and dragging:
 			dragging = false
 			
-			# SMART CLICK DETECTION: Measure the distance BEFORE we snap it!
 			var was_quick_click = global_position.distance_to(drag_start_pos) < 10.0
 			
 			if was_quick_click:
-				# You just clicked it! Toggle selection on/off.
 				is_selected = !is_selected
-				update_enemy_status()
-				# Snap it based on where it already is
+				update_visuals()
 				snap_to_grid(global_position) 
 			else:
-				# You dragged it across the board! Keep it selected for WASD.
 				is_selected = true
-				update_enemy_status()
-				# Snap it to the mouse cursor's new location
+				update_visuals()
 				snap_to_grid(get_global_mouse_position()) 
-
-	# 2. Hover Hotkeys
+	
+	# 2. KEYBOARD HOTKEYS
 	if is_hovered and event is InputEventKey and event.pressed:
 		if event.keycode == KEY_EQUAL: 
 			grid_size_in_squares += 1
@@ -145,34 +191,226 @@ func _input(event):
 				normalize_size()
 		elif event.keycode == KEY_X: 
 			is_enemy = !is_enemy
-			update_enemy_status()
+			update_visuals()
 
-
-# --- HOVER LOGIC ---
 func _on_mouse_entered():
 	is_hovered = true
-
 
 func _on_mouse_exited():
 	if not dragging:
 		is_hovered = false
 
-
-# --- VISUALS & SIZING ---
-func update_enemy_status():
-	# 1. GM is piloting: Yellow tint overrides everything
-	if is_selected:
-		sprite.modulate = Color(1.5, 1.5, 0.5, 0.753) 
-		return 
+# --- RADIAL MENU LOGIC ---
+func _setup_menu_signals():
+	hp_main_btn.pressed.connect(func(): _open_submenu(hp_action_menu, hp_main_btn, [amount_spinbox, damage_btn, heal_btn, level_up_btn]))
+	status_btn.pressed.connect(func(): _open_submenu(status_menu, status_btn, [status_color_picker, clear_status_btn]))
+	aura_btn.pressed.connect(func(): _open_submenu(aura_menu, aura_btn, [aura_radius_spin, aura_color_picker, clear_aura_btn]))
+	light_btn.pressed.connect(func(): _open_submenu(light_menu, light_btn, [light_radius_spin,clear_light_btn]))
+	edit_btn.pressed.connect(func(): _open_submenu(edit_menu, edit_btn, [name_input, base_color_picker, close_edit_btn]))
 	
-	# 2. Hostile: Red tint
-	if is_enemy:
-		sprite.modulate = Color(1.0, 0.502, 0.502, 0.788)
-		
-	# 3. Friendly/Default: Normal colors
-	else:
-		sprite.modulate = Color(1.0, 1.0, 1.0)
+	state_btn.pressed.connect(_on_state_toggle_pressed)
+	
+	damage_btn.pressed.connect(_on_damage_pressed)
+	heal_btn.pressed.connect(_on_heal_pressed)
+	level_up_btn.pressed.connect(_on_level_up_pressed)
+	
+	status_color_picker.color_changed.connect(_on_status_color_changed)
+	clear_status_btn.pressed.connect(_on_clear_status_pressed)
+	
+	aura_radius_spin.value_changed.connect(_on_aura_radius_changed)
+	aura_color_picker.color_changed.connect(_on_aura_color_changed)
+	clear_aura_btn.pressed.connect(_on_clear_aura_pressed)
+	
+	light_radius_spin.value_changed.connect(_on_light_radius_changed)
+	clear_light_btn.pressed.connect(_on_clear_light_pressed)
+	
+	name_input.text_changed.connect(_on_name_changed) # Updates in real-time as you type!
+	base_color_picker.color_changed.connect(_on_base_color_changed)
+	close_edit_btn.pressed.connect(func(): token_menu.hide())
 
+func place_on_circle(control_node: Control, angle_degrees: float, radius: float):
+	var angle_rad = deg_to_rad(angle_degrees)
+	control_node.position = Vector2(cos(angle_rad) * radius, sin(angle_rad) * radius) - (control_node.size / 2.0)
+
+func update_radial_menu():
+	token_menu.position = sprite.position 
+	
+	var inner_r = ((grid_size_in_squares * base_cell_size) / 2.0) + 10.0 
+	var main_r = inner_r + 65.0 
+	var sub_r = main_r + 75.0   
+	
+	token_menu.inner_radius = inner_r
+	token_menu.main_radius = main_r
+	token_menu.sub_radius = sub_r
+
+	# 1. Update the Global Array so the rest of the script knows what buttons exist!
+	current_main_btns = [hp_main_btn, status_btn, aura_btn, light_btn, edit_btn, state_btn]
+	hide_btn.visible = false 
+	
+	if GameState.is_gm_mode:
+		current_main_btns.append(hide_btn)
+		hide_btn.visible = true
+
+	token_menu.main_button_count = current_main_btns.size()
+	var main_step = 360.0 / current_main_btns.size()
+	
+	for i in range(current_main_btns.size()):
+		var angle = -90.0 + (i * main_step) 
+		var center_of_slice = inner_r + ((main_r - inner_r) / 2.0)
+		place_on_circle(current_main_btns[i], angle, center_of_slice)
+
+	token_menu.queue_redraw() 
+
+func _open_submenu(menu_to_show: Control, main_btn: Control, sub_items: Array):
+	main_menu.visible = false
+	hp_action_menu.visible = false
+	status_menu.visible = false
+	aura_menu.visible = false
+	light_menu.visible = false
+	edit_menu.visible = false # Make sure to hide the new edit menu!
+	menu_to_show.visible = true
+	
+	# NEW: Bulletproof Math. Find exactly where this button is in the circle!
+	var main_index = current_main_btns.find(main_btn)
+	var main_step = 360.0 / current_main_btns.size()
+	var parent_angle = -90.0 + (main_index * main_step)
+	
+	token_menu.active_submenu_angle = deg_to_rad(parent_angle)
+	token_menu.sub_button_count = sub_items.size()
+	
+	var sub_step = main_step
+	var start_angle = parent_angle - ((sub_items.size() * sub_step) / 2.0) + (sub_step / 2.0)
+	var center_of_outer_slice = token_menu.main_radius + ((token_menu.sub_radius - token_menu.main_radius) / 2.0)
+	
+	for i in range(sub_items.size()):
+		place_on_circle(sub_items[i], start_angle + (i * sub_step), center_of_outer_slice)
+		
+		
+	resize_handle.visible = (menu_to_show == edit_menu)
+	token_menu.queue_redraw()
+
+# --- MECHANICAL ACTIONS ---
+func _on_hp_main_pressed():
+	main_menu.visible = false
+	hp_action_menu.visible = true
+
+func _on_damage_pressed():
+	current_hp -= amount_spinbox.value
+	if current_hp < 0: current_hp = 0
+	hp_bar.value = current_hp
+	token_menu.hide()
+
+func _on_heal_pressed():
+	current_hp += amount_spinbox.value
+	if current_hp > max_hp: current_hp = max_hp
+	hp_bar.value = current_hp
+	token_menu.hide()
+
+func _on_level_up_pressed():
+	max_hp += amount_spinbox.value
+	hp_bar.max_value = max_hp
+	current_hp += amount_spinbox.value
+	hp_bar.value = current_hp
+	token_menu.hide()
+
+func _on_state_toggle_pressed():
+	is_dead = !is_dead
+	token_menu.hide()
+	update_visuals()
+
+func _on_status_color_changed(color: Color):
+	is_status_active = true
+	current_status_color = color
+	update_visuals() 
+	# Note: We don't hide the menu here, so the GM can slide the color wheel and see it change in real-time!
+
+func _on_clear_status_pressed():
+	is_status_active = false
+	token_menu.hide()
+	update_visuals()
+
+func _draw():
+	if current_aura_radius > 0:
+		draw_circle(Vector2.ZERO, current_aura_radius, current_aura_color)
+
+func _on_aura_radius_changed(value: float):
+	current_aura_radius = (value / 5.0) * base_cell_size
+	queue_redraw() 
+
+func _on_aura_color_changed(color: Color):
+	current_aura_color = color
+	queue_redraw()
+
+func _on_clear_aura_pressed():
+	current_aura_radius = 0.0
+	aura_radius_spin.value = 0 
+	queue_redraw()
+	token_menu.hide()
+
+func _on_light_radius_changed(value: float):
+	if value <= 0:
+		vision_light.energy = 0.0
+		return
+		
+	vision_light.energy = 1.0 
+	var desired_radius_pixels = (value / 5.0) * base_cell_size
+	var base_texture_radius = vision_light.texture.get_size().x / 2.0
+	vision_light.texture_scale = desired_radius_pixels / base_texture_radius
+
+func _on_light_color_changed(color: Color):
+	vision_light.color = color
+
+func _on_clear_light_pressed():
+	vision_light.energy = 0.0
+	light_radius_spin.value = 0 
+	token_menu.hide()
+
+func _on_name_changed(new_text: String):
+	character_name = new_text
+	name_label.text = character_name
+
+func _on_base_color_changed(color: Color):
+	name_color = color
+	name_label.modulate = name_color
+
+# --- RESIZE LOGIC ---
+func _on_resize_handle_input(event):
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		# Start or stop resizing based on the click
+		is_resizing = event.pressed
+		get_viewport().set_input_as_handled() # Stop the token from moving!
+		
+	elif event is InputEventMouseMotion and is_resizing:
+		# Add mouse movement directly to the stretch multiplier!
+		# We divide by base_cell_size so dragging 1 grid square = 1.0 scale increase
+		manual_stretch.x += event.relative.x / base_cell_size
+		manual_stretch.y += event.relative.y / base_cell_size
+		
+		# Prevent the GM from turning the token inside out!
+		manual_stretch.x = max(0.2, manual_stretch.x)
+		manual_stretch.y = max(0.2, manual_stretch.y)
+		
+		normalize_size() # Recalculate everything instantly
+
+
+# --- VISUAL UPDATERS ---
+func update_visuals():
+	if is_dead:
+		sprite.rotation_degrees = 90
+		sprite.modulate = Color(0.3, 0.3, 0.3) 
+		return 
+
+	sprite.rotation_degrees = 0
+	
+	if is_selected:
+		sprite.modulate = Color(1.5, 1.5, 0.5) # Yellow Piloting
+	elif is_enemy:
+		sprite.modulate = Color(1.0, 0.5, 0.5) # Red Hostile
+	elif is_status_active:
+		# Apply the GM's custom color!
+		sprite.modulate = Color(current_status_color.r, current_status_color.g, current_status_color.b, sprite.modulate.a)
+	else:
+		sprite.modulate = Color(1.0, 1.0, 1.0, sprite.modulate.a) # Normal
 
 func normalize_size():
 	if sprite.texture == null:
@@ -183,19 +421,19 @@ func normalize_size():
 	var scale_factor = 1.0
 	
 	if is_standee:
-		# Scale by width, let it be tall, and slide it up
 		scale_factor = target_pixels / image_size.x
-		sprite.scale = Vector2(scale_factor, scale_factor)
-		var actual_height = image_size.y * scale_factor
+		sprite.scale = Vector2(scale_factor, scale_factor) * manual_stretch
+		var actual_height = image_size.y * sprite.scale.y
 		sprite.position.y = -(actual_height - target_pixels) / 2.0
 	else:
-		# Shrink to fit inside the square completely
 		var max_dimension = max(image_size.x, image_size.y)
 		scale_factor = target_pixels / max_dimension
-		sprite.scale = Vector2(scale_factor, scale_factor)
+		sprite.scale = Vector2(scale_factor, scale_factor) * manual_stretch
 		sprite.position.y = 0 
 	
-	# Scale the clickable area to match the grid size
+	# Keep the handle perfectly pinned to the bottom right of the artwork!
+	var extents = (image_size * sprite.scale) / 2.0
+	resize_handle.position = sprite.position + extents - (resize_handle.size / 2.0)
 	if collision_shape.shape is RectangleShape2D:
 		collision_shape.shape.size = Vector2(target_pixels, target_pixels)
 	elif collision_shape.shape is CircleShape2D:
@@ -203,12 +441,10 @@ func normalize_size():
 		
 	update_ui_positions()
 
-
 func update_ui_positions():
 	var target_pixels = grid_size_in_squares * base_cell_size
 	var half_size = target_pixels / 2.0
 	
-	# 1. Name Label
 	name_label.size.x = 200 
 	name_label.position.x = -name_label.size.x / 2.0 
 	if is_standee:
@@ -217,37 +453,13 @@ func update_ui_positions():
 	else:
 		name_label.position.y = -half_size - name_label.size.y - 5 + label_y_offset
 	
-	# 2. HP Bar
 	hp_bar.size.x = target_pixels 
 	hp_bar.position.x = -hp_bar.size.x / 2.0 
 	hp_bar.position.y = half_size + 5
 	
-	# 3. Context Menu
-	token_menu.position.x = half_size + 10
-	token_menu.position.y = -token_menu.size.y / 2.0
+	update_radial_menu()
 
 
-# --- HP MENU LOGIC ---
-func _on_damage_pressed():
-	var amount = amount_spinbox.value
-	current_hp -= amount
-	if current_hp < 0: current_hp = 0
-	hp_bar.value = current_hp
-	token_menu.hide()
 
-
-func _on_heal_pressed():
-	var amount = amount_spinbox.value
-	current_hp += amount
-	if current_hp > max_hp: current_hp = max_hp
-	hp_bar.value = current_hp
-	token_menu.hide()
-
-
-func _on_level_up_pressed():
-	var amount = amount_spinbox.value
-	max_hp += amount
-	hp_bar.max_value = max_hp
-	current_hp += amount
-	hp_bar.value = current_hp
-	token_menu.hide()
+func set_selected(is_selected: bool):
+	highlight_ring.visible = is_selected

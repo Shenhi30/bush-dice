@@ -1,0 +1,42 @@
+[gd_scene format=3 uid="uid://cd4c1rkvbfvgq"]
+
+[ext_resource type="Script" uid="uid://cqlwaodud48kr" path="res://Scripts/MainBoard.gd" id="1_ockhe"]
+[ext_resource type="PackedScene" uid="uid://drlbrv55rl27a" path="res://Scenes/token.tscn" id="2_6bsxh"]
+[ext_resource type="Texture2D" uid="uid://brb3xjfgkvode" path="res://Assets/Maps/Continent west.jpg" id="2_m4kfr"]
+[ext_resource type="Script" uid="uid://b3x8hfopbgjdh" path="res://Scripts/GridOverlay.gd" id="3_d5o86"]
+[ext_resource type="Script" uid="uid://ot0uea5lnjo8" path="res://Scripts/CameraControls.gd" id="4_njf4n"]
+[ext_resource type="PackedScene" uid="uid://rq2pa5oxxsa1" path="res://Scenes/gm_dashboard.tscn" id="4_u7eij"]
+
+[node name="MainBoard" type="Node2D" unique_id=1607257795]
+script = ExtResource("1_ockhe")
+
+[node name="MapLayer" type="Node2D" parent="." unique_id=795627312]
+
+[node name="MapSprite" type="Sprite2D" parent="MapLayer" unique_id=498868549]
+texture = ExtResource("2_m4kfr")
+centered = false
+
+[node name="GridOverlay" type="Node2D" parent="MapLayer" unique_id=335564713]
+script = ExtResource("3_d5o86")
+
+[node name="GMLayer" type="Node2D" parent="." unique_id=1513480535]
+
+[node name="TokenLayer" type="Node2D" parent="." unique_id=2085070927]
+
+[node name="Token" parent="TokenLayer" unique_id=1895161753 instance=ExtResource("2_6bsxh")]
+position = Vector2(-33.673706, 385.2434)
+
+[node name="Darkness" type="CanvasModulate" parent="." unique_id=1358517977]
+color = Color(0.039215688, 0.039215688, 0.101960786, 1)
+
+[node name="GMCamera" type="Camera2D" parent="." unique_id=1675156281]
+script = ExtResource("4_njf4n")
+
+[node name="UILayer" type="CanvasLayer" parent="." unique_id=494524617]
+layer = 9
+
+[node name="GMDashboard" parent="UILayer" unique_id=1538053333 instance=ExtResource("4_u7eij")]
+
+[connection signal="map_loaded" from="UILayer/GMDashboard" to="." method="_on_gm_dashboard_map_loaded"]
+[connection signal="map_scale_changed" from="UILayer/GMDashboard" to="." method="_on_gm_dashboard_map_scale_changed"]
+[connection signal="spawn_token_requested" from="UILayer/GMDashboard" to="." method="_on_gm_dashboard_spawn_token_requested"]

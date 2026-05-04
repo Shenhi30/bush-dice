@@ -16,7 +16,22 @@ script = ExtResource("1_uw6j2")
 position = Vector2(302, 250)
 character_name = "Laura"
 is_enemy = true
+max_hp = 20
+current_hp = 20
+grid_size_in_squares = 1
+is_standee = false
+label_y_offset = 0.0
+grid_offset = Vector2(0, 0)
+move_speed = 300.0
 
 [node name="Token2" parent="." unique_id=837420156 instance=ExtResource("4_dyfb5")]
 position = Vector2(455, 249)
 character_name = "Test player"
+is_enemy = false
+max_hp = 20
+current_hp = 20
+grid_size_in_squares = 1
+is_standee = false
+label_y_offset = 0.0
+grid_offset = Vector2(0, 0)
+move_speed = 300.0
