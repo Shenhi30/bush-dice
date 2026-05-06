@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://rq2pa5oxxsa1"]
 
 [ext_resource type="Script" uid="uid://s8h7e6g1q2ff" path="res://Scripts/GMDashboard.gd" id="1_rj5mt"]
-[ext_resource type="ButtonGroup" uid="uid://plv3shyiyxe3" path="res://ButtonGroups/new_button_group.tres" id="2_qgoge"]
+[ext_resource type="ButtonGroup" uid="uid://plv3shyiyxe3" path="res://ButtonGroups/Dashboard/ToolBtn.tres" id="2_qgoge"]
 
 [node name="GMDashboard" type="CanvasLayer" unique_id=1538053333]
 script = ExtResource("1_rj5mt")
@@ -101,6 +101,12 @@ toggle_mode = true
 button_group = ExtResource("2_qgoge")
 text = "Erase"
 
+[node name="MeasureToolBtn" type="Button" parent="ToolPallete/VBoxContainer" unique_id=2091086774]
+layout_mode = 2
+toggle_mode = true
+button_group = ExtResource("2_qgoge")
+text = "Ruler"
+
 [connection signal="button_down" from="HBoxContainer/ScaleMinusBtn" to="." method="_on_scale_minus_btn_button_down"]
 [connection signal="button_up" from="HBoxContainer/ScaleMinusBtn" to="." method="_on_scale_minus_btn_button_up"]
 [connection signal="value_changed" from="HBoxContainer/MapScaleSpinBox" to="." method="_on_map_scale_spin_box_value_changed"]
@@ -110,3 +116,4 @@ text = "Erase"
 [connection signal="toggled" from="ToolPallete/VBoxContainer/SelectToolBtn" to="." method="_on_select_tool_btn_toggled"]
 [connection signal="toggled" from="ToolPallete/VBoxContainer/WallToolBtn" to="." method="_on_wall_tool_btn_toggled"]
 [connection signal="toggled" from="ToolPallete/VBoxContainer/EraseWallBtn" to="." method="_on_erase_wall_btn_toggled"]
+[connection signal="toggled" from="ToolPallete/VBoxContainer/MeasureToolBtn" to="." method="_on_measure_tool_btn_toggled"]

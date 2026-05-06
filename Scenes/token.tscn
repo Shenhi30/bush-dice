@@ -4,7 +4,8 @@
 [ext_resource type="Texture2D" uid="uid://bwdp363fbrbwx" path="res://Assets/Tokens/6662c45a04d674e152f8da8a-removebg-preview.png" id="2_ckhc0"]
 [ext_resource type="FontFile" uid="uid://dvpkfb7dbepkm" path="res://Assets/Fonts/Roboto-VariableFont_wdth,wght.ttf" id="3_ckhc0"]
 [ext_resource type="Script" uid="uid://bhqcncobtubtx" path="res://Scripts/RadialBackground.gd" id="4_r58tj"]
-[ext_resource type="Texture2D" uid="uid://bjvd6873sy56d" path="res://Assets/Icons/plain-dagger.png" id="5_7ve0p"]
+[ext_resource type="Theme" uid="uid://d4megw80kf305" path="res://Themes/SpiBoxes/SpinBoxBG.tres" id="5_qxpp4"]
+[ext_resource type="StyleBox" uid="uid://cg6qnogvr8b6s" path="res://Themes/ColorBoxes/ColorRounder.tres" id="6_qxpp4"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_w5to0"]
 size = Vector2(64, 64)
@@ -23,6 +24,8 @@ bg_color = Color(0, 0, 0, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_r58tj"]
 bg_color = Color(0, 0.64369816, 3.85046e-07, 1)
+
+[sub_resource type="Theme" id="Theme_7ve0p"]
 
 [sub_resource type="Gradient" id="Gradient_7ve0p"]
 colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 0)
@@ -83,12 +86,14 @@ show_percentage = false
 
 [node name="TokenMenu" type="Control" parent="UI" unique_id=1629885568]
 visible = false
+z_index = 1000
 material = SubResource("CanvasItemMaterial_7ve0p")
 anchors_preset = 0
 mouse_filter = 2
 script = ExtResource("4_r58tj")
 
 [node name="MainMenu" type="Control" parent="UI/TokenMenu" unique_id=1305289442]
+z_index = 1000
 material = SubResource("CanvasItemMaterial_7ve0p")
 layout_mode = 1
 anchors_preset = 0
@@ -97,6 +102,7 @@ offset_bottom = 40.0
 mouse_filter = 2
 
 [node name="HPMainBtn" type="Button" parent="UI/TokenMenu/MainMenu" unique_id=514269956]
+z_index = 1000
 material = SubResource("CanvasItemMaterial_7ve0p")
 layout_mode = 0
 offset_right = 8.0
@@ -105,6 +111,7 @@ text = "HP"
 flat = true
 
 [node name="StatusBtn" type="Button" parent="UI/TokenMenu/MainMenu" unique_id=1910669180]
+z_index = 1000
 material = SubResource("CanvasItemMaterial_7ve0p")
 layout_mode = 0
 offset_right = 8.0
@@ -113,6 +120,7 @@ text = "Status"
 flat = true
 
 [node name="AuraBtn" type="Button" parent="UI/TokenMenu/MainMenu" unique_id=358784136]
+z_index = 1000
 material = SubResource("CanvasItemMaterial_7ve0p")
 layout_mode = 0
 offset_right = 30.0
@@ -121,6 +129,7 @@ text = "Aura"
 flat = true
 
 [node name="LightBtn" type="Button" parent="UI/TokenMenu/MainMenu" unique_id=717072815]
+z_index = 1000
 material = SubResource("CanvasItemMaterial_7ve0p")
 layout_mode = 0
 offset_right = 30.0
@@ -129,6 +138,7 @@ text = "Fog"
 flat = true
 
 [node name="StateBtn" type="Button" parent="UI/TokenMenu/MainMenu" unique_id=1941489673]
+z_index = 1000
 material = SubResource("CanvasItemMaterial_7ve0p")
 layout_mode = 0
 offset_right = 30.0
@@ -137,6 +147,7 @@ text = "D/A"
 flat = true
 
 [node name="EditBtn" type="Button" parent="UI/TokenMenu/MainMenu" unique_id=853223385]
+z_index = 1000
 material = SubResource("CanvasItemMaterial_7ve0p")
 layout_mode = 0
 offset_right = 8.0
@@ -145,6 +156,7 @@ text = "Edit"
 flat = true
 
 [node name="HideBtn" type="Button" parent="UI/TokenMenu/MainMenu" unique_id=1760417886]
+z_index = 1000
 material = SubResource("CanvasItemMaterial_7ve0p")
 layout_mode = 0
 offset_right = 44.0
@@ -154,30 +166,36 @@ flat = true
 
 [node name="HPActionMenu" type="Control" parent="UI/TokenMenu" unique_id=1788668584]
 visible = false
+z_index = 1000
 material = SubResource("CanvasItemMaterial_7ve0p")
 layout_mode = 1
 anchors_preset = 0
 offset_right = 40.0
 offset_bottom = 40.0
 mouse_filter = 2
+theme = ExtResource("5_qxpp4")
 
 [node name="AmountSpinBox" type="SpinBox" parent="UI/TokenMenu/HPActionMenu" unique_id=258814095]
+z_index = 1000
 material = SubResource("CanvasItemMaterial_7ve0p")
 layout_mode = 0
 offset_right = 86.5
 offset_bottom = 31.0
 min_value = -9999.0
 max_value = 9999.0
+prefix = "DMG/HP:"
 
 [node name="DamageBtn" type="Button" parent="UI/TokenMenu/HPActionMenu" unique_id=673431039]
+z_index = 1000
 material = SubResource("CanvasItemMaterial_7ve0p")
 layout_mode = 0
 offset_right = 72.0
 offset_bottom = 31.0
-icon = ExtResource("5_7ve0p")
+text = "DMG"
 flat = true
 
 [node name="HealBtn" type="Button" parent="UI/TokenMenu/HPActionMenu" unique_id=998393978]
+z_index = 1000
 material = SubResource("CanvasItemMaterial_7ve0p")
 layout_mode = 0
 offset_right = 43.0
@@ -186,6 +204,7 @@ text = "Heal"
 flat = true
 
 [node name="LevelUpBtn" type="Button" parent="UI/TokenMenu/HPActionMenu" unique_id=894529489]
+z_index = 1000
 material = SubResource("CanvasItemMaterial_7ve0p")
 layout_mode = 0
 offset_right = 75.0
@@ -195,23 +214,31 @@ flat = true
 
 [node name="StatusMenu" type="Control" parent="UI/TokenMenu" unique_id=157092548]
 visible = false
+z_index = 1000
 material = SubResource("CanvasItemMaterial_7ve0p")
 layout_mode = 1
 anchors_preset = 0
 offset_right = 40.0
 offset_bottom = 40.0
 mouse_filter = 2
+theme = ExtResource("5_qxpp4")
 
 [node name="StatusColorPicker" type="ColorPickerButton" parent="UI/TokenMenu/StatusMenu" unique_id=2110805588]
+z_index = 1000
 material = SubResource("CanvasItemMaterial_7ve0p")
 layout_mode = 0
 offset_right = 8.0
 offset_bottom = 8.0
+theme_override_styles/normal = ExtResource("6_qxpp4")
+theme_override_styles/pressed = ExtResource("6_qxpp4")
+theme_override_styles/hover = ExtResource("6_qxpp4")
+theme_override_styles/focus = ExtResource("6_qxpp4")
 text = "Status"
 flat = true
 color = Color(0.76862746, 0.33333334, 0, 0.69803923)
 
 [node name="ClearStatusBtn" type="Button" parent="UI/TokenMenu/StatusMenu" unique_id=1539032797]
+z_index = 1000
 material = SubResource("CanvasItemMaterial_7ve0p")
 layout_mode = 0
 offset_right = 8.0
@@ -221,28 +248,38 @@ flat = true
 
 [node name="AuraMenu" type="Control" parent="UI/TokenMenu" unique_id=283994581]
 visible = false
+z_index = 1000
 material = SubResource("CanvasItemMaterial_7ve0p")
 layout_mode = 1
 anchors_preset = 0
 offset_right = 40.0
 offset_bottom = 40.0
 mouse_filter = 2
+theme = ExtResource("5_qxpp4")
 
 [node name="AuraRadiusSpinBox" type="SpinBox" parent="UI/TokenMenu/AuraMenu" unique_id=1643901627]
+z_index = 1000
 material = SubResource("CanvasItemMaterial_7ve0p")
 layout_mode = 0
 offset_right = 86.5
 offset_bottom = 31.0
+prefix = "Au:"
 
 [node name="AuraColorPicker" type="ColorPickerButton" parent="UI/TokenMenu/AuraMenu" unique_id=1971407797]
+z_index = 1000
 material = SubResource("CanvasItemMaterial_7ve0p")
 layout_mode = 0
 offset_right = 8.0
 offset_bottom = 8.0
+theme_override_styles/normal = ExtResource("6_qxpp4")
+theme_override_styles/pressed = ExtResource("6_qxpp4")
+theme_override_styles/hover = ExtResource("6_qxpp4")
+theme_override_styles/focus = ExtResource("6_qxpp4")
 text = "Aura"
 flat = true
 
 [node name="ClearAuraBtn" type="Button" parent="UI/TokenMenu/AuraMenu" unique_id=1408048914]
+z_index = 1000
 material = SubResource("CanvasItemMaterial_7ve0p")
 layout_mode = 0
 offset_right = 8.0
@@ -252,20 +289,24 @@ flat = true
 
 [node name="LightMenu" type="Control" parent="UI/TokenMenu" unique_id=305783175]
 visible = false
+z_index = 1000
 material = SubResource("CanvasItemMaterial_7ve0p")
 layout_mode = 1
 anchors_preset = 0
 offset_right = 40.0
 offset_bottom = 40.0
 mouse_filter = 2
+theme = ExtResource("5_qxpp4")
 
 [node name="LightRadiusSpinBox" type="SpinBox" parent="UI/TokenMenu/LightMenu" unique_id=1640827388]
+z_index = 1000
 material = SubResource("CanvasItemMaterial_7ve0p")
 layout_mode = 0
 offset_right = 86.5
 offset_bottom = 31.0
 
 [node name="ClearLightBtn" type="Button" parent="UI/TokenMenu/LightMenu" unique_id=349961990]
+z_index = 1000
 material = SubResource("CanvasItemMaterial_7ve0p")
 layout_mode = 0
 offset_right = 8.0
@@ -274,13 +315,17 @@ text = "Clear"
 flat = true
 
 [node name="EditMenu" type="Control" parent="UI/TokenMenu" unique_id=965303880]
+visible = false
+z_index = 1000
 material = SubResource("CanvasItemMaterial_7ve0p")
 layout_mode = 1
 anchors_preset = 0
 offset_right = 40.0
 offset_bottom = 40.0
+theme = ExtResource("5_qxpp4")
 
 [node name="NameInput" type="LineEdit" parent="UI/TokenMenu/EditMenu" unique_id=1476688518]
+z_index = 1000
 material = SubResource("CanvasItemMaterial_7ve0p")
 layout_mode = 0
 offset_right = 68.5
@@ -288,13 +333,42 @@ offset_bottom = 31.0
 placeholder_text = "Name"
 
 [node name="BaseColorPicker" type="ColorPickerButton" parent="UI/TokenMenu/EditMenu" unique_id=1241892249]
+z_index = 1000
 material = SubResource("CanvasItemMaterial_7ve0p")
 layout_mode = 0
 offset_right = 8.0
 offset_bottom = 8.0
+theme_override_styles/normal = ExtResource("6_qxpp4")
+theme_override_styles/pressed = ExtResource("6_qxpp4")
+theme_override_styles/hover = ExtResource("6_qxpp4")
+theme_override_styles/focus = ExtResource("6_qxpp4")
 text = "NameColor"
 
+[node name="ACSpinBox" type="SpinBox" parent="UI/TokenMenu/EditMenu" unique_id=1173969544]
+z_index = 1000
+layout_mode = 0
+offset_right = 86.5
+offset_bottom = 31.0
+theme = SubResource("Theme_7ve0p")
+prefix = "AC:"
+
+[node name="SpeedSpinBox" type="SpinBox" parent="UI/TokenMenu/EditMenu" unique_id=2049592998]
+z_index = 1000
+layout_mode = 0
+offset_right = 86.5
+offset_bottom = 31.0
+prefix = "Spd:"
+
+[node name="InitBonusSpinBox" type="SpinBox" parent="UI/TokenMenu/EditMenu" unique_id=51934775]
+layout_mode = 0
+offset_right = 86.5
+offset_bottom = 31.0
+theme = ExtResource("5_qxpp4")
+min_value = -10.0
+prefix = "Init: "
+
 [node name="CloseEditBtn" type="Button" parent="UI/TokenMenu/EditMenu" unique_id=1577681827]
+z_index = 1000
 material = SubResource("CanvasItemMaterial_7ve0p")
 layout_mode = 0
 offset_right = 50.0

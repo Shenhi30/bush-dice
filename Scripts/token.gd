@@ -2,13 +2,22 @@ extends CharacterBody2D
 
 
 # --- STATS & STATE ---
-@export var character_name: String = "Unknown"
-@export var is_enemy: bool = false
-@export var max_hp: int = 20
-@export var current_hp: int = 20
-var is_dead: bool = false
-var is_status_active: bool = false
-var current_status_color: Color = Color("c45500b2") # Default status
+
+# The Token's "Brain"
+var data: Dictionary = {
+	"name": "Unknown",
+	"hp": 20,
+	"max_hp": 20,
+	"ac": 10,
+	"speed": 30,
+	"faction": "neutral", # Can be "neutral", "enemy", or "ally"
+	"is_dead": false,
+	"is_status_active": false,
+	"status_color": "c45500b2", # Saved as a hex string so it can be written to JSON later!
+	"init_bonus": 2,
+	"current_init": 0
+}
+
 var current_aura_radius: float = 0.0
 var current_aura_color: Color = Color(0.0, 1.0, 0.0, 0.2) 
 var name_color:Color = Color.WHITE
@@ -76,15 +85,23 @@ var drag_start_pos: Vector2 = Vector2.ZERO
 @onready var edit_menu = $UI/TokenMenu/EditMenu
 @onready var name_input = $UI/TokenMenu/EditMenu/NameInput
 @onready var base_color_picker = $UI/TokenMenu/EditMenu/BaseColorPicker
+@onready var ac_spinbox = $UI/TokenMenu/EditMenu/ACSpinBox
+@onready var speed_spinbox = $UI/TokenMenu/EditMenu/SpeedSpinBox
+@onready var init_bonus_spinbox = $UI/TokenMenu/EditMenu/InitBonusSpinBox
 @onready var close_edit_btn = $UI/TokenMenu/EditMenu/CloseEditBtn
 
 @onready var resize_handle = $UI/ResizeHandle
 
 func _ready():
-	name_label.text = character_name
+	name_label.text = data["name"]
+	hp_bar.max_value = data["max_hp"]
+	hp_bar.value = data["hp"]
 	name_label.modulate = name_color
-	hp_bar.max_value = max_hp
-	hp_bar.value = current_hp
+	
+	
+	_style_radial_spinbox(ac_spinbox)
+	_style_radial_spinbox(speed_spinbox)
+	_style_radial_spinbox(init_bonus_spinbox)
 	
 	update_visuals()
 	
@@ -102,6 +119,9 @@ func _ready():
 	mouse_entered.connect(_on_mouse_entered)
 	mouse_exited.connect(_on_mouse_exited)
 	resize_handle.gui_input.connect(_on_resize_handle_input)
+	
+	
+	
 	
 	_setup_menu_signals()
 
@@ -138,6 +158,25 @@ func snap_to_grid(target_pos: Vector2 = global_position):
 	var center_offset = base_cell_size / 2.0
 	global_position = Vector2(snapped_x + center_offset, snapped_y + center_offset) + grid_offset
 
+# --- DATA MANAGEMENT ---
+func update_data(key: String, new_value):
+	# Update or add the value to the dictionary
+	data[key] = new_value
+	
+	# Automatically update visuals/UI based on what changed
+	if key == "name":
+		name_label.text = data["name"]
+	elif key == "hp" or key == "max_hp":
+		hp_bar.max_value = data["max_hp"]
+		hp_bar.value = data["hp"]
+	elif key == "faction" or key == "is_dead":
+		update_visuals()
+	elif key == "is_status_active" or key == "status_color":
+		update_visuals()
+	
+
+
+
 # --- INPUT LOGIC ---
 func _on_input_event(_viewport, event, _shape_idx):
 	if event is InputEventMouseButton:
@@ -146,7 +185,7 @@ func _on_input_event(_viewport, event, _shape_idx):
 		if event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
 			dragging = true
 			drag_start_pos = global_position 
-			
+
 		# 2. RIGHT CLICK DOWN: Open Menu (Only for the token you are touching!)
 		elif event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
 			token_menu.visible = !token_menu.visible
@@ -190,7 +229,10 @@ func _input(event):
 				grid_size_in_squares -= 1
 				normalize_size()
 		elif event.keycode == KEY_X: 
-			is_enemy = !is_enemy
+			# Cycle through factions: Neutral -> Enemy -> Ally -> Neutral
+			if data["faction"] == "neutral": update_data("faction", "enemy")
+			elif data["faction"] == "enemy": update_data("faction", "ally")
+			else: update_data("faction", "neutral")
 			update_visuals()
 
 func _on_mouse_entered():
@@ -206,7 +248,7 @@ func _setup_menu_signals():
 	status_btn.pressed.connect(func(): _open_submenu(status_menu, status_btn, [status_color_picker, clear_status_btn]))
 	aura_btn.pressed.connect(func(): _open_submenu(aura_menu, aura_btn, [aura_radius_spin, aura_color_picker, clear_aura_btn]))
 	light_btn.pressed.connect(func(): _open_submenu(light_menu, light_btn, [light_radius_spin,clear_light_btn]))
-	edit_btn.pressed.connect(func(): _open_submenu(edit_menu, edit_btn, [name_input, base_color_picker, close_edit_btn]))
+	edit_btn.pressed.connect(_on_edit_btn_pressed)
 	
 	state_btn.pressed.connect(_on_state_toggle_pressed)
 	
@@ -226,6 +268,9 @@ func _setup_menu_signals():
 	
 	name_input.text_changed.connect(_on_name_changed) # Updates in real-time as you type!
 	base_color_picker.color_changed.connect(_on_base_color_changed)
+	ac_spinbox.value_changed.connect(func(val): update_data("ac", val))
+	speed_spinbox.value_changed.connect(func(val): update_data("speed", val))
+	init_bonus_spinbox.value_changed.connect(func(val): update_data("init_bonus", val))
 	close_edit_btn.pressed.connect(func(): token_menu.hide())
 
 func place_on_circle(control_node: Control, angle_degrees: float, radius: float):
@@ -289,43 +334,49 @@ func _open_submenu(menu_to_show: Control, main_btn: Control, sub_items: Array):
 	resize_handle.visible = (menu_to_show == edit_menu)
 	token_menu.queue_redraw()
 
+
 # --- MECHANICAL ACTIONS ---
 func _on_hp_main_pressed():
 	main_menu.visible = false
 	hp_action_menu.visible = true
 
 func _on_damage_pressed():
-	current_hp -= amount_spinbox.value
-	if current_hp < 0: current_hp = 0
-	hp_bar.value = current_hp
+	var new_hp = max(0, data["hp"] - amount_spinbox.value)
+	update_data("hp", new_hp)
 	token_menu.hide()
 
 func _on_heal_pressed():
-	current_hp += amount_spinbox.value
-	if current_hp > max_hp: current_hp = max_hp
-	hp_bar.value = current_hp
+	var new_hp = min(data["max_hp"], data["hp"] + amount_spinbox.value)
+	update_data("hp", new_hp)
 	token_menu.hide()
 
 func _on_level_up_pressed():
-	max_hp += amount_spinbox.value
-	hp_bar.max_value = max_hp
-	current_hp += amount_spinbox.value
-	hp_bar.value = current_hp
+	update_data("max_hp", data["max_hp"] + amount_spinbox.value)
+	update_data("hp", data["hp"] + amount_spinbox.value)
 	token_menu.hide()
 
 func _on_state_toggle_pressed():
-	is_dead = !is_dead
+	update_data("is_dead", !data["is_dead"])
 	token_menu.hide()
-	update_visuals()
+
+func _on_name_changed(new_text: String):
+	update_data("name", new_text)
+
+func _on_status_btn_pressed():
+	# Read the hex string from the brain and set the color picker
+	status_color_picker.color = Color(data["status_color"])
+	
+	# Open the menu
+	_open_submenu(status_menu, status_btn, [status_color_picker, clear_status_btn])
 
 func _on_status_color_changed(color: Color):
-	is_status_active = true
-	current_status_color = color
+	update_data("is_status_active", true)
+	update_data("status_color", color.to_html(true)) # Converts Color to Hex String
 	update_visuals() 
 	# Note: We don't hide the menu here, so the GM can slide the color wheel and see it change in real-time!
 
 func _on_clear_status_pressed():
-	is_status_active = false
+	update_data("is_status_active", false)
 	token_menu.hide()
 	update_visuals()
 
@@ -365,13 +416,22 @@ func _on_clear_light_pressed():
 	light_radius_spin.value = 0 
 	token_menu.hide()
 
-func _on_name_changed(new_text: String):
-	character_name = new_text
-	name_label.text = character_name
-
 func _on_base_color_changed(color: Color):
 	name_color = color
 	name_label.modulate = name_color
+
+func _on_edit_btn_pressed():
+	# Read current stats
+	name_input.text = data["name"]
+	ac_spinbox.value = data["ac"]
+	speed_spinbox.value = data["speed"]
+	init_bonus_spinbox.value = data["init_bonus"]
+	
+	# Tell the color picker to show the current name color!
+	base_color_picker.color = name_color
+	
+	# Open menu with the new buttons added to the array
+	_open_submenu(edit_menu, edit_btn, [name_input, ac_spinbox, speed_spinbox, init_bonus_spinbox, base_color_picker, close_edit_btn])
 
 # --- RESIZE LOGIC ---
 func _on_resize_handle_input(event):
@@ -393,24 +453,47 @@ func _on_resize_handle_input(event):
 		normalize_size() # Recalculate everything instantly
 
 
+# --- UI HELPERS ---
+func _style_radial_spinbox(spinbox: SpinBox):
+	# Grab the hidden text box
+	var line_edit = spinbox.get_line_edit()
+	
+	# 1. Force the text to be bright white
+	line_edit.add_theme_color_override("font_color", Color.WHITE)
+	
+	# 2. Create an empty background box
+	var empty_style = StyleBoxEmpty.new()
+	
+	# 3. Apply the empty background to all states so the dark box NEVER appears
+	line_edit.add_theme_stylebox_override("normal", empty_style)
+	line_edit.add_theme_stylebox_override("focus", empty_style)
+	line_edit.add_theme_stylebox_override("read_only", empty_style)
+	
+	# 4. Center the text nicely between the arrows
+	line_edit.alignment = HORIZONTAL_ALIGNMENT_CENTER
+
 # --- VISUAL UPDATERS ---
 func update_visuals():
-	if is_dead:
+	if data["is_dead"]:
 		sprite.rotation_degrees = 90
 		sprite.modulate = Color(0.3, 0.3, 0.3) 
-		return 
+		return
 
 	sprite.rotation_degrees = 0
 	
 	if is_selected:
 		sprite.modulate = Color(1.5, 1.5, 0.5) # Yellow Piloting
-	elif is_enemy:
+	elif data["faction"] == "enemy":
 		sprite.modulate = Color(1.0, 0.5, 0.5) # Red Hostile
-	elif is_status_active:
-		# Apply the GM's custom color!
-		sprite.modulate = Color(current_status_color.r, current_status_color.g, current_status_color.b, sprite.modulate.a)
+	elif data["faction"] == "ally":
+		sprite.modulate = Color(0.5, 1.0, 0.5) # Green Ally
+	elif data["is_status_active"]:
+		# Convert the hex string back to a real Godot Color
+		var c = Color(data["status_color"])
+		# Apply the color, but keep the sprite's original transparency (alpha)
+		sprite.modulate = Color(c.r, c.g, c.b, sprite.modulate.a)
 	else:
-		sprite.modulate = Color(1.0, 1.0, 1.0, sprite.modulate.a) # Normal
+		sprite.modulate = Color(1.0, 1.0, 1.0, sprite.modulate.a) # Normal Neutral
 
 func normalize_size():
 	if sprite.texture == null:

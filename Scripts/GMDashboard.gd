@@ -152,3 +152,8 @@ func _on_wall_tool_btn_toggled(toggled_on: bool) -> void:
 func _on_erase_wall_btn_toggled(toggled_on: bool) -> void:
 	if toggled_on:
 		tool_mode_changed.emit(2) 
+
+# 3 = MEASURE mode
+func _on_measure_tool_btn_toggled(toggled_on: bool) -> void:
+	if toggled_on:
+		tool_mode_changed.emit(3)

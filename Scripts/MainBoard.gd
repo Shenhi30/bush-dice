@@ -1,7 +1,7 @@
 extends Node2D
 
 # --- MODES & TOOLS ---
-enum Mode { SELECT, DRAW_WALL, ERASE_WALL }
+enum Mode { SELECT, DRAW_WALL, ERASE_WALL, MEASURE }
 var current_mode: Mode = Mode.SELECT
 
 # --- SELECTION & DRAGGING VARIABLES ---
@@ -18,10 +18,19 @@ var wall_start_pos: Vector2 = Vector2.ZERO
 var wall_end_pos: Vector2 = Vector2.ZERO
 @onready var wall_layer = $WallLayer # Make sure this matches your new node name!
 
+# --- RULER VARIABLES ---
+var is_measuring: bool = false
+var measure_start_pos: Vector2 = Vector2.ZERO
+var measure_end_pos: Vector2 = Vector2.ZERO
+
 @onready var map_layer = $MapLayer/MapSprite
 @onready var gm_layer = $GMLayer
 @onready var token_layer = $TokenLayer
 @onready var darkness = $Darkness
+
+
+# Initiative
+@onready var token_list = $UILayer/InitiativeTracker/MarginContainer/VBoxContainer/TokenList
 
 const TOKEN_SCENE = preload("res://Scenes/token.tscn")
 
@@ -141,6 +150,32 @@ func _unhandled_input(event):
 				# 2. If we found one, destroy it!
 				if wall_to_delete:
 					wall_to_delete.queue_free()
+	# ==========================================
+	# MODE 4: MEASURING DISTANCE
+	# ==========================================
+	elif current_mode == Mode.MEASURE:
+		if event is InputEventMouseButton:
+			# LEFT CLICK: Anchor the start of the tape measure
+			if event.button_index == MOUSE_BUTTON_LEFT:
+				if event.pressed:
+					is_measuring = true
+					measure_start_pos = get_snapped_center(get_global_mouse_position())
+					measure_end_pos = measure_start_pos
+				else:
+					# Let go to stop measuring
+					is_measuring = false
+					
+			# RIGHT CLICK: Cancel the measurement
+			elif event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
+				is_measuring = false
+				
+			token_layer.queue_redraw()
+			
+		# MOUSE MOVE: Stretch the tape measure
+		elif event is InputEventMouseMotion and is_measuring:
+			measure_end_pos =get_snapped_center(get_global_mouse_position())
+			token_layer.queue_redraw()
+			##print("Measuring line to: ", measure_end_pos)
 
 func _clear_selection():
 	for token in selected_tokens:
@@ -177,7 +212,28 @@ func _on_token_layer_draw():
 	if is_drawing_wall:
 		# Draw a bright red line, 4 pixels thick, to show where the wall goes
 		token_layer.draw_line(wall_start_pos, wall_end_pos, Color.RED, 4.0)
-
+	# --- DRAW RULER ---
+	if is_measuring:
+		# 1. Draw a thick, slightly transparent golden line
+		token_layer.draw_line(measure_start_pos, measure_end_pos, Color(0.987, 0.536, 0.942, 0.7), 6.0)
+		
+		# 2. Calculate the distance in feet (Assuming 64px = 1 grid square = 5ft)
+		var pixel_distance = measure_start_pos.distance_to(measure_end_pos)
+		var grid_size = 64.0 # Change this if your grid squares are a different size!
+		var feet_distance = (pixel_distance / grid_size) * 5.0
+		
+		# 3. Create the text (e.g., "30 ft.")
+		var distance_text = str(round(feet_distance)) + " ft."
+		
+		# 4. Find the middle of the line to place the text
+		var mid_point = (measure_start_pos + measure_end_pos) / 2.0
+		var font = ThemeDB.fallback_font # Built-in Godot font
+		var font_size = 24
+		
+		# Draw a black "shadow" text first so it's readable over light maps
+		token_layer.draw_string(font, mid_point + Vector2(2, 22), distance_text, HORIZONTAL_ALIGNMENT_CENTER, -1, font_size, Color.BLACK)
+		# Draw the bright white text on top
+		token_layer.draw_string(font, mid_point + Vector2(0, 20), distance_text, HORIZONTAL_ALIGNMENT_CENTER, -1, font_size, Color.WHITE)
 
 func _spawn_permanent_wall(start: Vector2, end: Vector2):
 	if start.distance_to(end) < 5.0:
@@ -213,6 +269,56 @@ func _spawn_permanent_wall(start: Vector2, end: Vector2):
 	# 4. ADD TO THE BOARD
 	wall_layer.add_child(new_wall)
 
+# INITIATIVE
+func _on_roll_init_btn_pressed():
+	var all_tokens = $TokenLayer.get_children()
+	var active_tokens = []
+	
+	# 1. Roll the dice for everyone!
+	for token in all_tokens:
+		if "data" in token: # Make sure it's actually a token with a brain
+			# Roll a random number between 1 and 20, then add their bonus
+			var roll = randi_range(1, 20)
+			token.update_data("current_init", roll + token.data["init_bonus"])
+			active_tokens.append(token)
+			
+	# 2. Sort the list from highest to lowest
+	active_tokens.sort_custom(_sort_highest_init)
+	
+	# 3. Update the UI Panel
+	_populate_initiative_ui(active_tokens)
+
+func _sort_highest_init(a, b):
+	return a.data["current_init"] > b.data["current_init"]
+
+func _populate_initiative_ui(sorted_tokens: Array):
+	# Clear the old names out of the UI
+	for child in token_list.get_children():
+		child.queue_free()
+		
+	# Spawn a new label for each token in order
+	for token in sorted_tokens:
+		var row = HBoxContainer.new()
+		
+		var name_label = Label.new()
+		name_label.text = token.data["name"]
+		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL # Pushes the score to the right
+		
+		var score_label = Label.new()
+		score_label.text = str(token.data["current_init"])
+		
+		# (Optional Quality of Life: Color the text based on their faction!)
+		if token.data["faction"] == "enemy":
+			name_label.modulate = Color.RED
+			score_label.modulate = Color.RED
+		elif token.data["faction"] == "ally":
+			name_label.modulate = Color.GREEN
+			score_label.modulate = Color.GREEN
+			
+		row.add_child(name_label)
+		row.add_child(score_label)
+		
+		token_list.add_child(row)
 
 func _on_gm_mode_changed(is_gm: bool):
 	# If the GM wants to see the whole map without shadows, 
@@ -224,6 +330,8 @@ func _on_gm_mode_changed(is_gm: bool):
 	
 	# Show or hide the GM layer for traps and notes!
 	gm_layer.visible = is_gm
+
+
 
 # Helper function to spawn tokens cleanly via code later
 func add_token_to_board(token_node):
@@ -237,7 +345,10 @@ func _on_gm_dashboard_spawn_token_requested(image_path: String, y_offset: float,
 	# (Make sure these variable names match what you called them inside Token.gd!)
 	new_token.art_path = image_path 
 	new_token.height_offset = y_offset
-	new_token.is_enemy = is_enemy_flag
+	if is_enemy_flag:
+		new_token.data["faction"] = "enemy"
+	else:
+		new_token.data["faction"] = "neutral"
 	
 	# 3. Drop it into the TokenLayer folder
 	token_layer.add_child(new_token)
@@ -313,3 +424,15 @@ func _get_wall_under_mouse(mouse_pos: Vector2) -> Node2D:
 				best_wall = wall
 				
 	return best_wall
+
+func get_snapped_center(pos: Vector2) -> Vector2:
+	var grid_size = 64.0 # Change this if your base grid size is different!
+	
+	# 1. Divide by grid size and floor it to find which "column" and "row" we are in
+	var snapped_x = floor(pos.x / grid_size) * grid_size
+	var snapped_y = floor(pos.y / grid_size) * grid_size
+	
+	# 2. Add half the grid size to push the coordinate exactly into the center
+	var center_offset = grid_size / 2.0
+	
+	return Vector2(snapped_x + center_offset, snapped_y + center_offset)

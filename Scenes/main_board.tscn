@@ -52,7 +52,43 @@ layer = 9
 
 [node name="GMDashboard" parent="UILayer" unique_id=1538053333 instance=ExtResource("4_u7eij")]
 
+[node name="InitiativeTracker" type="PanelContainer" parent="UILayer" unique_id=808262133]
+anchors_preset = 6
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = -94.0
+offset_top = -324.0
+offset_right = 3.0
+offset_bottom = 324.0
+grow_horizontal = 0
+grow_vertical = 2
+
+[node name="MarginContainer" type="MarginContainer" parent="UILayer/InitiativeTracker" unique_id=1488440711]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="VBoxContainer" type="VBoxContainer" parent="UILayer/InitiativeTracker/MarginContainer" unique_id=1696090090]
+layout_mode = 2
+
+[node name="RollInitBtn" type="Button" parent="UILayer/InitiativeTracker/MarginContainer/VBoxContainer" unique_id=68125049]
+layout_mode = 2
+text = "Roll Initiative"
+flat = true
+autowrap_mode = 3
+
+[node name="HSeparator" type="HSeparator" parent="UILayer/InitiativeTracker/MarginContainer/VBoxContainer" unique_id=378939025]
+layout_mode = 2
+
+[node name="TokenList" type="VBoxContainer" parent="UILayer/InitiativeTracker/MarginContainer/VBoxContainer" unique_id=972718831]
+layout_mode = 2
+
 [connection signal="map_loaded" from="UILayer/GMDashboard" to="." method="_on_gm_dashboard_map_loaded"]
 [connection signal="map_scale_changed" from="UILayer/GMDashboard" to="." method="_on_gm_dashboard_map_scale_changed"]
 [connection signal="spawn_token_requested" from="UILayer/GMDashboard" to="." method="_on_gm_dashboard_spawn_token_requested"]
 [connection signal="tool_mode_changed" from="UILayer/GMDashboard" to="." method="_on_gm_dashboard_tool_mode_changed"]
+[connection signal="pressed" from="UILayer/InitiativeTracker/MarginContainer/VBoxContainer/RollInitBtn" to="." method="_on_roll_init_btn_pressed"]
