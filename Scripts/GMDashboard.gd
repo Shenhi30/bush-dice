@@ -5,6 +5,8 @@ signal map_loaded(file_path: String)
 signal spawn_token_requested(image_path: String, y_offset: float, is_enemy_flag: bool)
 signal map_scale_changed(new_scale: float)
 
+signal tool_mode_changed(mode_index: int)
+
 # Map Nodes
 @onready var load_map_button = $HBoxContainer/LoadMapButton
 @onready var map_dropdown = $HBoxContainer/MapDropdown
@@ -135,3 +137,18 @@ func _on_scale_plus_btn_button_down():
 
 func _on_scale_plus_btn_button_up():
 	is_holding_plus = false
+
+# We pass 0 for SELECT mode
+func _on_select_tool_btn_toggled(toggled_on: bool) -> void:
+	if toggled_on:
+		tool_mode_changed.emit(0)
+
+# 1 = DRAW_WALL mode
+func _on_wall_tool_btn_toggled(toggled_on: bool) -> void:
+	if toggled_on:
+		tool_mode_changed.emit(1)
+
+# 2 = ERASE mode
+func _on_erase_wall_btn_toggled(toggled_on: bool) -> void:
+	if toggled_on:
+		tool_mode_changed.emit(2) 

@@ -7,6 +7,15 @@
 [ext_resource type="Script" uid="uid://ot0uea5lnjo8" path="res://Scripts/CameraControls.gd" id="4_njf4n"]
 [ext_resource type="PackedScene" uid="uid://rq2pa5oxxsa1" path="res://Scenes/gm_dashboard.tscn" id="4_u7eij"]
 
+[sub_resource type="Gradient" id="Gradient_m4kfr"]
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_d5o86"]
+gradient = SubResource("Gradient_m4kfr")
+width = 1
+height = 1
+fill = 1
+fill_from = Vector2(0.5, 0.4764706)
+
 [node name="MainBoard" type="Node2D" unique_id=1607257795]
 script = ExtResource("1_ockhe")
 
@@ -19,7 +28,13 @@ centered = false
 [node name="GridOverlay" type="Node2D" parent="MapLayer" unique_id=335564713]
 script = ExtResource("3_d5o86")
 
+[node name="PointLight2D" type="PointLight2D" parent="." unique_id=1950032905]
+shadow_enabled = true
+texture = SubResource("GradientTexture2D_d5o86")
+
 [node name="GMLayer" type="Node2D" parent="." unique_id=1513480535]
+
+[node name="WallLayer" type="Node2D" parent="." unique_id=293265149]
 
 [node name="TokenLayer" type="Node2D" parent="." unique_id=2085070927]
 
@@ -40,3 +55,4 @@ layer = 9
 [connection signal="map_loaded" from="UILayer/GMDashboard" to="." method="_on_gm_dashboard_map_loaded"]
 [connection signal="map_scale_changed" from="UILayer/GMDashboard" to="." method="_on_gm_dashboard_map_scale_changed"]
 [connection signal="spawn_token_requested" from="UILayer/GMDashboard" to="." method="_on_gm_dashboard_spawn_token_requested"]
+[connection signal="tool_mode_changed" from="UILayer/GMDashboard" to="." method="_on_gm_dashboard_tool_mode_changed"]

@@ -1,5 +1,9 @@
 extends Node2D
 
+# --- MODES & TOOLS ---
+enum Mode { SELECT, DRAW_WALL, ERASE_WALL }
+var current_mode: Mode = Mode.SELECT
+
 # --- SELECTION & DRAGGING VARIABLES ---
 var drag_start: Vector2 = Vector2.ZERO
 var drag_end: Vector2 = Vector2.ZERO
@@ -7,6 +11,12 @@ var is_drawing_box: bool = false      # Used for the blue selection square
 var is_dragging_tokens: bool = false  # Used for moving the actual characters
 var last_mouse_pos: Vector2 = Vector2.ZERO
 var selected_tokens: Array = []
+
+# --- WALL DRAWING VARIABLES ---
+var is_drawing_wall: bool = false
+var wall_start_pos: Vector2 = Vector2.ZERO
+var wall_end_pos: Vector2 = Vector2.ZERO
+@onready var wall_layer = $WallLayer # Make sure this matches your new node name!
 
 @onready var map_layer = $MapLayer/MapSprite
 @onready var gm_layer = $GMLayer
@@ -34,57 +44,103 @@ func _get_token_under_mouse(mouse_pos: Vector2):
 	return null # We clicked empty space
 
 func _unhandled_input(event):
-	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
-		if event.pressed:
-			var clicked_token = _get_token_under_mouse(get_global_mouse_position())
+	# ==========================================
+	# MODE 1: SELECTING & DRAGGING TOKENS
+	# ==========================================
+	if current_mode == Mode.SELECT:
+		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+			if event.pressed:
+				var clicked_token = _get_token_under_mouse(get_global_mouse_position())
 			
-			if clicked_token:
+				if clicked_token:
 				# 1. WE CLICKED A TOKEN
 				# If we clicked a token that isn't selected yet, clear the others and select only this one
-				if not clicked_token in selected_tokens:
-					_clear_selection()
-					selected_tokens.append(clicked_token)
-					if clicked_token.has_method("set_selected"):
-						clicked_token.set_selected(true)
+					if not clicked_token in selected_tokens:
+						_clear_selection()
+						selected_tokens.append(clicked_token)
+						if clicked_token.has_method("set_selected"):
+							clicked_token.set_selected(true)
 				
 				# Start moving the tokens!
-				is_dragging_tokens = true
-				last_mouse_pos = get_global_mouse_position()
+					is_dragging_tokens = true
+					last_mouse_pos = get_global_mouse_position()
 				
-			else:
+				else:
 				# 2. WE CLICKED EMPTY SPACE
 				# Start drawing the blue selection box
-				is_drawing_box = true
-				drag_start = get_global_mouse_position()
-				drag_end = drag_start
+					is_drawing_box = true
+					drag_start = get_global_mouse_position()
+					drag_end = drag_start
 				
-		else:
+			else:
 			# 3. WE LET GO OF THE MOUSE BUTTON
-			if is_drawing_box:
-				is_drawing_box = false
-				_select_tokens_in_box()
+				if is_drawing_box:
+					is_drawing_box = false
+					_select_tokens_in_box()
 			
-			if is_dragging_tokens:
-				is_dragging_tokens = false
+				if is_dragging_tokens:
+					is_dragging_tokens = false
 				# (Later, we can add code right here to "Snap" the tokens perfectly to the grid!)
 				
-		token_layer.queue_redraw()
-		
-	elif event is InputEventMouseMotion:
-		# 4. WE ARE MOVING THE MOUSE
-		if is_drawing_box:
-			drag_end = get_global_mouse_position()
 			token_layer.queue_redraw()
+		
+		elif event is InputEventMouseMotion:
+		# 4. WE ARE MOVING THE MOUSE
+			if is_drawing_box:
+				drag_end = get_global_mouse_position()
+				token_layer.queue_redraw()
 			
-		elif is_dragging_tokens:
-			var current_mouse = get_global_mouse_position()
-			var drag_offset = current_mouse - last_mouse_pos
+			elif is_dragging_tokens:
+				var current_mouse = get_global_mouse_position()
+				var drag_offset = current_mouse - last_mouse_pos
 			
 			# Physically move every selected token by the exact amount the mouse moved
-			for token in selected_tokens:
-				token.global_position += drag_offset
+				for token in selected_tokens:
+					token.global_position += drag_offset
 				
-			last_mouse_pos = current_mouse
+				last_mouse_pos = current_mouse
+	# ==========================================
+	# MODE 2: DRAWING WALLS
+	# ==========================================
+	elif current_mode == Mode.DRAW_WALL:
+		if event is InputEventMouseButton:
+			# LEFT CLICK: Start drawing or place the wall
+			if event.button_index == MOUSE_BUTTON_LEFT:
+				if event.pressed:
+					# We just clicked! Anchor the start point.
+					is_drawing_wall = true
+					wall_start_pos = get_global_mouse_position()
+					wall_end_pos = wall_start_pos
+				else:
+					# We let go! Save the permanent wall and stop drawing.
+					if is_drawing_wall:
+						_spawn_permanent_wall(wall_start_pos, wall_end_pos)
+						is_drawing_wall = false
+						
+			# RIGHT CLICK: Cancel the current wall (changed our mind)
+			elif event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
+				is_drawing_wall = false
+				
+			# Tell the board to update our preview line
+			queue_redraw() 
+			
+		# MOUSE MOVE: Update the preview line as we drag
+		elif event is InputEventMouseMotion and is_drawing_wall:
+			wall_end_pos = get_global_mouse_position()
+			queue_redraw()
+			
+	# ==========================================
+	# MODE 3: ERASING WALLS
+	# ==========================================
+	elif current_mode == Mode.ERASE_WALL:
+		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+			if event.pressed:
+				# 1. Ask our helper if we clicked a wall
+				var wall_to_delete = _get_wall_under_mouse(get_global_mouse_position())
+				
+				# 2. If we found one, destroy it!
+				if wall_to_delete:
+					wall_to_delete.queue_free()
 
 func _clear_selection():
 	for token in selected_tokens:
@@ -117,6 +173,46 @@ func _on_token_layer_draw():
 		# Notice we added "token_layer." before the draw_rect commands!
 		token_layer.draw_rect(rect, Color(0.2, 0.5, 1.0, 0.3), true) 
 		token_layer.draw_rect(rect, Color(0.2, 0.5, 1.0, 0.8), false, 2.0)
+		
+	if is_drawing_wall:
+		# Draw a bright red line, 4 pixels thick, to show where the wall goes
+		token_layer.draw_line(wall_start_pos, wall_end_pos, Color.RED, 4.0)
+
+
+func _spawn_permanent_wall(start: Vector2, end: Vector2):
+	if start.distance_to(end) < 5.0:
+		return 
+
+	# 1. CREATE THE VISUAL LINE
+	var new_wall = Line2D.new()
+	new_wall.add_point(start)
+	new_wall.add_point(end)
+	new_wall.default_color = Color(0.8, 0.1, 0.1, 0.8)
+	new_wall.width = 5.0
+	
+	# 2. ADD PHYSICAL COLLISION (Blocks Tokens)
+	var static_body = StaticBody2D.new()
+	var collision_shape = CollisionShape2D.new()
+	var segment = SegmentShape2D.new()
+	segment.a = start
+	segment.b = end
+	collision_shape.shape = segment
+	
+	static_body.add_child(collision_shape)
+	new_wall.add_child(static_body)
+	
+	# 3. ADD SHADOW CASTER (Blocks Light)
+	var occluder = LightOccluder2D.new()
+	var poly = OccluderPolygon2D.new()
+	poly.polygon = PackedVector2Array([start, end])
+	poly.closed = false # CRITICAL: Tells Godot this is a line, not a closed box
+	occluder.occluder = poly
+	
+	new_wall.add_child(occluder)
+	
+	# 4. ADD TO THE BOARD
+	wall_layer.add_child(new_wall)
+
 
 func _on_gm_mode_changed(is_gm: bool):
 	# If the GM wants to see the whole map without shadows, 
@@ -186,3 +282,34 @@ func _on_gm_dashboard_map_loaded(file_path: String):
 		print("Map changed successfully!")
 	else:
 		push_error("Failed to load image from path: " + file_path)
+
+func _on_gm_dashboard_tool_mode_changed(mode_index: int) -> void:
+	# mode_index exactly matches the order of our enum Mode { SELECT, DRAW_WALL }
+	current_mode = mode_index as Mode
+	
+	# If we switch tools while drawing a wall, cancel the wall
+	is_drawing_wall = false
+	queue_redraw()
+	
+	print("Tool changed to mode: ", current_mode)
+
+func _get_wall_under_mouse(mouse_pos: Vector2) -> Node2D:
+	var best_wall = null
+	var min_dist = 15.0 # The "click radius". Adjust if it's too hard to click walls!
+	
+	# Check every wall we have drawn
+	for wall in wall_layer.get_children():
+		if wall is Line2D and wall.points.size() >= 2:
+			var start = wall.points[0]
+			var end = wall.points[1]
+			
+			# Find the closest point on this line segment to our mouse
+			var closest_point = Geometry2D.get_closest_point_to_segment(mouse_pos, start, end)
+			var dist = mouse_pos.distance_to(closest_point)
+			
+			# If it's within our click radius, we found our wall!
+			if dist < min_dist:
+				min_dist = dist
+				best_wall = wall
+				
+	return best_wall
