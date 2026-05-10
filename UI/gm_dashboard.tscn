@@ -10,21 +10,15 @@ script = ExtResource("1_rj5mt")
 offset_right = 40.0
 offset_bottom = 40.0
 
-[node name="LoadMapButton" type="Button" parent="HBoxContainer" unique_id=1737477210]
+[node name="ToggleMapsBtn" type="Button" parent="HBoxContainer" unique_id=652971019]
 layout_mode = 2
-text = "Load new map"
+text = "🗺️ Map Library"
 
-[node name="MapDropdown" type="OptionButton" parent="HBoxContainer" unique_id=949035582]
+[node name="ToggleTokensBtn" type="Button" parent="HBoxContainer" unique_id=1944828654]
 layout_mode = 2
+text = "♟️ Token Library"
 
 [node name="VSeparator" type="VSeparator" parent="HBoxContainer" unique_id=1262882304]
-layout_mode = 2
-
-[node name="LoadTokenArtButton" type="Button" parent="HBoxContainer" unique_id=1123379448]
-layout_mode = 2
-text = "Load Token"
-
-[node name="TokenDropdown" type="OptionButton" parent="HBoxContainer" unique_id=972361713]
 layout_mode = 2
 
 [node name="OffsetSpinBox" type="SpinBox" parent="HBoxContainer" unique_id=1520144766]
@@ -33,10 +27,6 @@ min_value = -100.0
 
 [node name="EnemyCheckBox" type="CheckBox" parent="HBoxContainer" unique_id=848550990]
 layout_mode = 2
-
-[node name="SpawnTokenButton" type="Button" parent="HBoxContainer" unique_id=520939734]
-layout_mode = 2
-text = "Spawn Token"
 
 [node name="ScaleMinusBtn" type="Button" parent="HBoxContainer" unique_id=231113454]
 custom_minimum_size = Vector2(30, 30)
@@ -54,6 +44,25 @@ value = 1.0
 custom_minimum_size = Vector2(30, 30)
 layout_mode = 2
 text = "+"
+
+[node name="SaveCampaignBtn" type="Button" parent="HBoxContainer" unique_id=304986741]
+layout_mode = 2
+text = "Save"
+
+[node name="LoadCampaignBtn" type="Button" parent="HBoxContainer" unique_id=889002350]
+layout_mode = 2
+text = "Load"
+
+[node name="SceneDropdown" type="OptionButton" parent="HBoxContainer" unique_id=2116612878]
+layout_mode = 2
+
+[node name="AddSceneBtn" type="Button" parent="HBoxContainer" unique_id=2101288721]
+layout_mode = 2
+text = "➕ New Map"
+
+[node name="RenameSceneBtn" type="Button" parent="HBoxContainer" unique_id=465513626]
+layout_mode = 2
+text = "✏️ Rename"
 
 [node name="MapFileDialog" type="FileDialog" parent="." unique_id=1593283077]
 oversampling_override = 1.0
@@ -107,11 +116,91 @@ toggle_mode = true
 button_group = ExtResource("2_qgoge")
 text = "Ruler"
 
+[node name="MapDrawer" type="PanelContainer" parent="." unique_id=1767252311]
+visible = false
+custom_minimum_size = Vector2(400, 300)
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="VBoxContainer" type="VBoxContainer" parent="MapDrawer" unique_id=1292650524]
+layout_mode = 2
+
+[node name="TopControls" type="HBoxContainer" parent="MapDrawer/VBoxContainer" unique_id=1349321181]
+layout_mode = 2
+
+[node name="ImportMapBtn" type="Button" parent="MapDrawer/VBoxContainer/TopControls" unique_id=1957454182]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "➕ Import New Map"
+
+[node name="CloseMapBtn" type="Button" parent="MapDrawer/VBoxContainer/TopControls" unique_id=1611998614]
+layout_mode = 2
+text = "❌ Close"
+
+[node name="ScrollContainer" type="ScrollContainer" parent="MapDrawer/VBoxContainer" unique_id=898260583]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="MapGrid" type="GridContainer" parent="MapDrawer/VBoxContainer/ScrollContainer" unique_id=264260742]
+layout_mode = 2
+columns = 4
+
+[node name="TokenDrawer" type="PanelContainer" parent="." unique_id=1762281018]
+visible = false
+custom_minimum_size = Vector2(400, 300)
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="VBoxContainer" type="VBoxContainer" parent="TokenDrawer" unique_id=791810256]
+layout_mode = 2
+
+[node name="TopControls" type="HBoxContainer" parent="TokenDrawer/VBoxContainer" unique_id=935915182]
+layout_mode = 2
+
+[node name="ImportTokenBtn" type="Button" parent="TokenDrawer/VBoxContainer/TopControls" unique_id=148786769]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "➕ Import New Token
+"
+
+[node name="CloseTokenBtn" type="Button" parent="TokenDrawer/VBoxContainer/TopControls" unique_id=399539880]
+layout_mode = 2
+text = "❌ Close"
+
+[node name="ScrollContainer" type="ScrollContainer" parent="TokenDrawer/VBoxContainer" unique_id=2001920251]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="TokenGrid" type="GridContainer" parent="TokenDrawer/VBoxContainer/ScrollContainer" unique_id=778220795]
+layout_mode = 2
+columns = 4
+
+[node name="SaveFileDialog" type="FileDialog" parent="." unique_id=1442769507]
+access = 2
+filters = PackedStringArray("*.json")
+
+[node name="LoadFileDialog" type="FileDialog" parent="." unique_id=1114909305]
+title = "Open a File"
+ok_button_text = "Load"
+file_mode = 0
+access = 2
+filters = PackedStringArray("*.json")
+
+[node name="RenameDialog" type="ConfirmationDialog" parent="." unique_id=909496590]
+title = "Rename Scene"
+
+[node name="NewNameInput" type="LineEdit" parent="RenameDialog" unique_id=16037894]
+custom_minimum_size = Vector2(200, 0)
+offset_right = 68.5
+offset_bottom = 31.0
+
 [connection signal="button_down" from="HBoxContainer/ScaleMinusBtn" to="." method="_on_scale_minus_btn_button_down"]
 [connection signal="button_up" from="HBoxContainer/ScaleMinusBtn" to="." method="_on_scale_minus_btn_button_up"]
+[connection signal="pressed" from="HBoxContainer/ScaleMinusBtn" to="." method="_on_scale_minus_btn_pressed"]
 [connection signal="value_changed" from="HBoxContainer/MapScaleSpinBox" to="." method="_on_map_scale_spin_box_value_changed"]
 [connection signal="button_down" from="HBoxContainer/ScalePlusBtn" to="." method="_on_scale_plus_btn_button_down"]
 [connection signal="button_up" from="HBoxContainer/ScalePlusBtn" to="." method="_on_scale_plus_btn_button_up"]
+[connection signal="pressed" from="HBoxContainer/ScalePlusBtn" to="." method="_on_scale_plus_btn_pressed"]
 [connection signal="toggled" from="ToolPallete/VBoxContainer/Bypass Fog" to="." method="_on_bypass_fog_toggled"]
 [connection signal="toggled" from="ToolPallete/VBoxContainer/SelectToolBtn" to="." method="_on_select_tool_btn_toggled"]
 [connection signal="toggled" from="ToolPallete/VBoxContainer/WallToolBtn" to="." method="_on_wall_tool_btn_toggled"]

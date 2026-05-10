@@ -1,6 +1,5 @@
 extends CharacterBody2D
 
-
 # --- STATS & STATE ---
 
 # The Token's "Brain"
@@ -15,7 +14,9 @@ var data: Dictionary = {
 	"is_status_active": false,
 	"status_color": "c45500b2", # Saved as a hex string so it can be written to JSON later!
 	"init_bonus": 2,
-	"current_init": 0
+	"current_init": 0,
+	"is_hiden": false,
+	"owner_id": 1,
 }
 
 var current_aura_radius: float = 0.0
@@ -50,18 +51,17 @@ var drag_start_pos: Vector2 = Vector2.ZERO
 @onready var collision_shape = $CollisionShape2D
 @onready var vision_light = $VisionLight
 
-
 @onready var highlight_ring = $HightLightRing
 # --- MENU REFERENCES ---
 @onready var token_menu = $UI/TokenMenu
 @onready var main_menu = $UI/TokenMenu/MainMenu
 @onready var hp_main_btn = $UI/TokenMenu/MainMenu/HPMainBtn
-@onready var hide_btn = $UI/TokenMenu/MainMenu/HideBtn
 @onready var status_btn = $UI/TokenMenu/MainMenu/StatusBtn
 @onready var aura_btn = $UI/TokenMenu/MainMenu/AuraBtn
 @onready var light_btn = $UI/TokenMenu/MainMenu/LightBtn
 @onready var state_btn = $UI/TokenMenu/MainMenu/StateBtn
 @onready var edit_btn = $UI/TokenMenu/MainMenu/EditBtn
+@onready var hide_btn = $UI/TokenMenu/MainMenu/HideBtn
 
 @onready var hp_action_menu = $UI/TokenMenu/HPActionMenu
 @onready var amount_spinbox = $UI/TokenMenu/HPActionMenu/AmountSpinBox
@@ -88,6 +88,8 @@ var drag_start_pos: Vector2 = Vector2.ZERO
 @onready var ac_spinbox = $UI/TokenMenu/EditMenu/ACSpinBox
 @onready var speed_spinbox = $UI/TokenMenu/EditMenu/SpeedSpinBox
 @onready var init_bonus_spinbox = $UI/TokenMenu/EditMenu/InitBonusSpinBox
+@onready var owner_input = $UI/TokenMenu/EditMenu/OwnerInput
+@onready var assign_owner_btn = $UI/TokenMenu/EditMenu/AssignOwnerBtn
 @onready var close_edit_btn = $UI/TokenMenu/EditMenu/CloseEditBtn
 
 @onready var resize_handle = $UI/ResizeHandle
@@ -103,6 +105,19 @@ func _ready():
 	_style_radial_spinbox(speed_spinbox)
 	_style_radial_spinbox(init_bonus_spinbox)
 	
+	# 1. Make the LineEdit transparent with white centered text
+	var empty_style = StyleBoxEmpty.new()
+	owner_input.add_theme_stylebox_override("normal", empty_style)
+	owner_input.add_theme_stylebox_override("focus", empty_style)
+	owner_input.add_theme_color_override("font_color", Color.WHITE)
+	owner_input.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	
+	# 2. Force both nodes to be small enough to fit inside the ring slice
+	owner_input.custom_minimum_size = Vector2(70, 30)
+	owner_input.size = Vector2(70, 30)
+	assign_owner_btn.custom_minimum_size = Vector2(60, 30)
+	assign_owner_btn.size = Vector2(60, 30)
+	
 	update_visuals()
 	
 	if art_path != "":
@@ -115,15 +130,38 @@ func _ready():
 		label_y_offset = height_offset
 	
 	normalize_size()
-	input_event.connect(_on_input_event) 
+	input_event
 	mouse_entered.connect(_on_mouse_entered)
 	mouse_exited.connect(_on_mouse_exited)
 	resize_handle.gui_input.connect(_on_resize_handle_input)
 	
 	
-	
-	
 	_setup_menu_signals()
+
+func _process(_delta):
+	var my_name = GameState.player_name
+	var is_gm = GameState.is_gm_mode
+	
+	# 1. THE HIDE BUTTON LOGIC
+	if data.get("is_hidden", false) and not is_gm:
+		visible = false # Poof! Vanishes for players.
+	else:
+		visible = true
+		
+	# 2. THE STATS & VISION LOGIC
+	var token_owner = data.get("owner_id", 1) 
+	
+	# THE MAGIC HYBRID CHECK:
+	# If you are the GM, you have absolute power. 
+	# If you are a player, your name must match the owner string!
+	if is_gm or my_name == str(token_owner):
+		name_label.visible = true 
+		hp_bar.visible = true
+		vision_light.visible = true
+	else:
+		name_label.visible = false
+		hp_bar.visible = false
+		vision_light.visible = false
 
 # --- MOVEMENT (HYBRID DRAG + WASD) ---
 func _physics_process(_delta):
@@ -173,8 +211,6 @@ func update_data(key: String, new_value):
 		update_visuals()
 	elif key == "is_status_active" or key == "status_color":
 		update_visuals()
-	
-
 
 
 # --- INPUT LOGIC ---
@@ -249,6 +285,7 @@ func _setup_menu_signals():
 	aura_btn.pressed.connect(func(): _open_submenu(aura_menu, aura_btn, [aura_radius_spin, aura_color_picker, clear_aura_btn]))
 	light_btn.pressed.connect(func(): _open_submenu(light_menu, light_btn, [light_radius_spin,clear_light_btn]))
 	edit_btn.pressed.connect(_on_edit_btn_pressed)
+	hide_btn.pressed.connect(_on_hide_btn_pressed)
 	
 	state_btn.pressed.connect(_on_state_toggle_pressed)
 	
@@ -265,6 +302,8 @@ func _setup_menu_signals():
 	
 	light_radius_spin.value_changed.connect(_on_light_radius_changed)
 	clear_light_btn.pressed.connect(_on_clear_light_pressed)
+	
+	assign_owner_btn.pressed.connect(_on_assign_owner_pressed)
 	
 	name_input.text_changed.connect(_on_name_changed) # Updates in real-time as you type!
 	base_color_picker.color_changed.connect(_on_base_color_changed)
@@ -428,10 +467,42 @@ func _on_edit_btn_pressed():
 	init_bonus_spinbox.value = data["init_bonus"]
 	
 	# Tell the color picker to show the current name color!
+	owner_input.text = str(data.get("owner_id", 1))
 	base_color_picker.color = name_color
 	
 	# Open menu with the new buttons added to the array
-	_open_submenu(edit_menu, edit_btn, [name_input, ac_spinbox, speed_spinbox, init_bonus_spinbox, base_color_picker, close_edit_btn])
+	_open_submenu(edit_menu, edit_btn, [
+		name_input, ac_spinbox, speed_spinbox, init_bonus_spinbox, base_color_picker,
+		owner_input, assign_owner_btn,
+		close_edit_btn
+	])
+
+func _on_assign_owner_pressed():
+	var new_owner_name = owner_input.text
+	if new_owner_name == "":
+		new_owner_name = "GM"
+		
+	update_data("owner_id", new_owner_name)
+	
+	var main_board = get_node_or_null("../../")
+	if main_board and main_board.has_method("broadcast_token_owner"):
+		main_board.broadcast_token_owner(name, new_owner_name)
+		
+	print("Assigned ownership to Player: " + new_owner_name)
+	token_menu.hide()
+
+func _on_hide_btn_pressed():
+	# Flip the boolean! If it was false, make it true.
+	var new_hidden_state = !data.get("is_hidden", false)
+	update_data("is_hidden", new_hidden_state)
+	
+	# Tell the MainBoard to broadcast this secret across the internet!
+	var main_board = get_node_or_null("../../")
+	if main_board and main_board.has_method("broadcast_token_hidden_state"):
+		main_board.broadcast_token_hidden_state(name, new_hidden_state)
+		
+	token_menu.hide()
+	update_visuals()
 
 # --- RESIZE LOGIC ---
 func _on_resize_handle_input(event):
@@ -486,7 +557,7 @@ func update_visuals():
 	elif data["faction"] == "enemy":
 		sprite.modulate = Color(1.0, 0.5, 0.5) # Red Hostile
 	elif data["faction"] == "ally":
-		sprite.modulate = Color(0.5, 1.0, 0.5) # Green Ally
+		sprite.modulate = Color(0.5, 1.0, 0.5, 1.0) # Green Ally
 	elif data["is_status_active"]:
 		# Convert the hex string back to a real Godot Color
 		var c = Color(data["status_color"])
@@ -494,6 +565,13 @@ func update_visuals():
 		sprite.modulate = Color(c.r, c.g, c.b, sprite.modulate.a)
 	else:
 		sprite.modulate = Color(1.0, 1.0, 1.0, sprite.modulate.a) # Normal Neutral
+	# --- GM GHOST VISION ---
+	if data.get("is_hidden", false) and GameState.is_gm_mode:
+		sprite.modulate.a = 0.4 # Make it ghostly!
+	else:
+		sprite.modulate.a = 1.0 # Solid
+
+
 
 func normalize_size():
 	if sprite.texture == null:
@@ -541,7 +619,6 @@ func update_ui_positions():
 	hp_bar.position.y = half_size + 5
 	
 	update_radial_menu()
-
 
 
 func set_selected(is_selected: bool):

@@ -47,6 +47,16 @@ placeholder_text = "Ip"
 layout_mode = 2
 text = "Host"
 
+[node name="LoadCampaignBtn" type="Button" parent="CenterContainer/VBoxContainer" unique_id=1282355028]
+layout_mode = 2
+text = "📂 Load Saved Campaign"
+
 [node name="JoinButton" type="Button" parent="CenterContainer/VBoxContainer" unique_id=193178422]
 layout_mode = 2
 text = "Join Ip"
+
+[node name="LoadCampaignDialog" type="FileDialog" parent="." unique_id=192650964]
+title = "Open a File"
+file_mode = 0
+access = 2
+filters = PackedStringArray("*.json")

@@ -1,0 +1,125 @@
+{
+	"active_scene_id": "map_1",
+	"campaign_name": "New Campaign",
+	"quests": [
+		{
+			"title": "kill"
+		}
+	],
+	"scenes": {
+		"map_1": {
+			"map_image_path": "res://Assets/Maps/Vasen 23.jpg",
+			"map_scale": 1.6,
+			"tokens": [
+				{
+					"art_path": "",
+					"data": {
+						"ac": 10.0,
+						"current_init": 0.0,
+						"faction": "neutral",
+						"hp": 20.0,
+						"init_bonus": 2.0,
+						"is_dead": false,
+						"is_status_active": false,
+						"max_hp": 20.0,
+						"name": "Unknown",
+						"speed": 30.0,
+						"status_color": "c45500b2"
+					},
+					"height_offset": 0.0,
+					"name": "@CharacterBody2D@917",
+					"x": -544.0,
+					"y": 352.0
+				},
+				{
+					"art_path": "res://Assets/Tokens/Laura.jpg",
+					"data": {
+						"ac": 10.0,
+						"current_init": 0.0,
+						"faction": "neutral",
+						"hp": 20.0,
+						"init_bonus": 2.0,
+						"is_dead": false,
+						"is_status_active": false,
+						"max_hp": 20.0,
+						"name": "Unknown",
+						"speed": 30.0,
+						"status_color": "c45500b2"
+					},
+					"height_offset": 0.0,
+					"name": "@CharacterBody2D@930",
+					"x": 352.0,
+					"y": 672.0
+				},
+				{
+					"art_path": "res://Assets/Tokens/6662c45a04d674e152f8da8a-removebg-preview.png",
+					"data": {
+						"ac": 10.0,
+						"current_init": 0.0,
+						"faction": "ally",
+						"hp": 20.0,
+						"init_bonus": 2.0,
+						"is_dead": false,
+						"is_status_active": false,
+						"max_hp": 20.0,
+						"name": "Unknown",
+						"speed": 30.0,
+						"status_color": "c45500b2"
+					},
+					"height_offset": 0.0,
+					"name": "@CharacterBody2D@943",
+					"x": 480.0,
+					"y": 544.0
+				}
+			],
+			"walls": []
+		},
+		"map_2": {
+			"map_image_path": "res://Assets/Maps/59x42.jpg",
+			"map_scale": 1.0,
+			"tokens": [
+				{
+					"art_path": "res://Assets/Tokens/Laura.jpg",
+					"data": {
+						"ac": 10.0,
+						"current_init": 0.0,
+						"faction": "neutral",
+						"hp": 20.0,
+						"init_bonus": 2.0,
+						"is_dead": false,
+						"is_status_active": false,
+						"max_hp": 20.0,
+						"name": "Unknown",
+						"speed": 30.0,
+						"status_color": "c45500b2"
+					},
+					"height_offset": 0.0,
+					"name": "Token_77298_4953",
+					"x": 288.0,
+					"y": 352.0
+				},
+				{
+					"art_path": "res://Assets/Tokens/6662c45a04d674e152f8da8a-removebg-preview.png",
+					"data": {
+						"ac": 10.0,
+						"current_init": 0.0,
+						"faction": "neutral",
+						"hp": 20.0,
+						"init_bonus": 2.0,
+						"is_dead": false,
+						"is_status_active": false,
+						"max_hp": 20.0,
+						"name": "Unknown",
+						"speed": 30.0,
+						"status_color": "c45500b2"
+					},
+					"height_offset": 0.0,
+					"name": "Token_81885_5676",
+					"x": 288.0,
+					"y": 224.0
+				}
+			],
+			"walls": []
+		}
+	}
+}

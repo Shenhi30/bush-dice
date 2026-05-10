@@ -2,10 +2,10 @@
 
 [ext_resource type="Script" uid="uid://cqlwaodud48kr" path="res://Scripts/MainBoard.gd" id="1_ockhe"]
 [ext_resource type="PackedScene" uid="uid://drlbrv55rl27a" path="res://Scenes/token.tscn" id="2_6bsxh"]
-[ext_resource type="Texture2D" uid="uid://brb3xjfgkvode" path="res://Assets/Maps/Continent west.jpg" id="2_m4kfr"]
 [ext_resource type="Script" uid="uid://b3x8hfopbgjdh" path="res://Scripts/GridOverlay.gd" id="3_d5o86"]
 [ext_resource type="Script" uid="uid://ot0uea5lnjo8" path="res://Scripts/CameraControls.gd" id="4_njf4n"]
-[ext_resource type="PackedScene" uid="uid://rq2pa5oxxsa1" path="res://Scenes/gm_dashboard.tscn" id="4_u7eij"]
+[ext_resource type="PackedScene" uid="uid://rq2pa5oxxsa1" path="res://UI/gm_dashboard.tscn" id="4_u7eij"]
+[ext_resource type="Script" uid="uid://5utvh4al0krb" path="res://Scripts/QuestTracker.gd" id="7_d5o86"]
 
 [sub_resource type="Gradient" id="Gradient_m4kfr"]
 
@@ -22,7 +22,6 @@ script = ExtResource("1_ockhe")
 [node name="MapLayer" type="Node2D" parent="." unique_id=795627312]
 
 [node name="MapSprite" type="Sprite2D" parent="MapLayer" unique_id=498868549]
-texture = ExtResource("2_m4kfr")
 centered = false
 
 [node name="GridOverlay" type="Node2D" parent="MapLayer" unique_id=335564713]
@@ -39,6 +38,7 @@ texture = SubResource("GradientTexture2D_d5o86")
 [node name="TokenLayer" type="Node2D" parent="." unique_id=2085070927]
 
 [node name="Token" parent="TokenLayer" unique_id=1895161753 instance=ExtResource("2_6bsxh")]
+visible = false
 position = Vector2(-33.673706, 385.2434)
 
 [node name="Darkness" type="CanvasModulate" parent="." unique_id=1358517977]
@@ -48,47 +48,164 @@ color = Color(0.039215688, 0.039215688, 0.101960786, 1)
 script = ExtResource("4_njf4n")
 
 [node name="UILayer" type="CanvasLayer" parent="." unique_id=494524617]
-layer = 9
+layer = 10
 
 [node name="GMDashboard" parent="UILayer" unique_id=1538053333 instance=ExtResource("4_u7eij")]
 
-[node name="InitiativeTracker" type="PanelContainer" parent="UILayer" unique_id=808262133]
-anchors_preset = 6
+[node name="TabContainer" type="TabContainer" parent="UILayer" unique_id=1725244790]
+anchors_preset = 1
 anchor_left = 1.0
-anchor_top = 0.5
 anchor_right = 1.0
-anchor_bottom = 0.5
-offset_left = -94.0
-offset_top = -324.0
-offset_right = 3.0
-offset_bottom = 324.0
+offset_left = -155.0
+offset_bottom = 648.0
 grow_horizontal = 0
-grow_vertical = 2
+current_tab = 1
 
-[node name="MarginContainer" type="MarginContainer" parent="UILayer/InitiativeTracker" unique_id=1488440711]
+[node name="InitiativeTracker" type="PanelContainer" parent="UILayer/TabContainer" unique_id=808262133]
+visible = false
+layout_mode = 2
+metadata/_tab_index = 0
+
+[node name="MarginContainer" type="MarginContainer" parent="UILayer/TabContainer/InitiativeTracker" unique_id=1488440711]
 layout_mode = 2
 theme_override_constants/margin_left = 10
 theme_override_constants/margin_top = 10
 theme_override_constants/margin_right = 10
 theme_override_constants/margin_bottom = 10
 
-[node name="VBoxContainer" type="VBoxContainer" parent="UILayer/InitiativeTracker/MarginContainer" unique_id=1696090090]
+[node name="VBoxContainer" type="VBoxContainer" parent="UILayer/TabContainer/InitiativeTracker/MarginContainer" unique_id=1696090090]
 layout_mode = 2
 
-[node name="RollInitBtn" type="Button" parent="UILayer/InitiativeTracker/MarginContainer/VBoxContainer" unique_id=68125049]
+[node name="RollInitBtn" type="Button" parent="UILayer/TabContainer/InitiativeTracker/MarginContainer/VBoxContainer" unique_id=68125049]
 layout_mode = 2
 text = "Roll Initiative"
 flat = true
 autowrap_mode = 3
 
-[node name="HSeparator" type="HSeparator" parent="UILayer/InitiativeTracker/MarginContainer/VBoxContainer" unique_id=378939025]
+[node name="ResetInitBtn" type="Button" parent="UILayer/TabContainer/InitiativeTracker/MarginContainer/VBoxContainer" unique_id=222054577]
+layout_mode = 2
+text = "Reset"
+autowrap_mode = 3
+
+[node name="HSeparator" type="HSeparator" parent="UILayer/TabContainer/InitiativeTracker/MarginContainer/VBoxContainer" unique_id=378939025]
 layout_mode = 2
 
-[node name="TokenList" type="VBoxContainer" parent="UILayer/InitiativeTracker/MarginContainer/VBoxContainer" unique_id=972718831]
+[node name="TokenList" type="VBoxContainer" parent="UILayer/TabContainer/InitiativeTracker/MarginContainer/VBoxContainer" unique_id=972718831]
 layout_mode = 2
+
+[node name="ChatPanel" type="Panel" parent="UILayer/TabContainer" unique_id=1959821814]
+layout_mode = 2
+metadata/_tab_index = 1
+
+[node name="VBoxContainer" type="VBoxContainer" parent="UILayer/TabContainer/ChatPanel" unique_id=401390300]
+layout_mode = 0
+offset_right = 187.0
+offset_bottom = 577.0
+
+[node name="ChatLog" type="RichTextLabel" parent="UILayer/TabContainer/ChatPanel/VBoxContainer" unique_id=966366671]
+layout_mode = 2
+size_flags_vertical = 3
+bbcode_enabled = true
+text = "Chat log"
+fit_content = true
+
+[node name="HBoxContainer" type="HBoxContainer" parent="UILayer/TabContainer/ChatPanel/VBoxContainer" unique_id=1947132347]
+layout_mode = 2
+
+[node name="ChatInput" type="LineEdit" parent="UILayer/TabContainer/ChatPanel/VBoxContainer/HBoxContainer" unique_id=617066684]
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Chat"
+flat = true
+
+[node name="SendBtn" type="Button" parent="UILayer/TabContainer/ChatPanel/VBoxContainer/HBoxContainer" unique_id=2079632110]
+layout_mode = 2
+text = "Send"
+flat = true
+
+[node name="PlayerListPanel" type="Panel" parent="UILayer/TabContainer" unique_id=1391938670]
+visible = false
+layout_mode = 2
+metadata/_tab_index = 2
+
+[node name="PlayerContainer" type="VBoxContainer" parent="UILayer/TabContainer/PlayerListPanel" unique_id=710236949]
+layout_mode = 0
+offset_top = -1.0
+offset_right = 99.0
+offset_bottom = 39.0
+
+[node name="DiceRollPanel" type="PanelContainer" parent="UILayer" unique_id=1178777124]
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -77.0
+offset_top = -40.0
+offset_right = 405.0
+grow_horizontal = 2
+grow_vertical = 0
+
+[node name="HBoxContainer" type="HBoxContainer" parent="UILayer/DiceRollPanel" unique_id=1282694786]
+layout_mode = 2
+
+[node name="CountBox" type="SpinBox" parent="UILayer/DiceRollPanel/HBoxContainer" unique_id=1992042967]
+layout_mode = 2
+min_value = 1.0
+max_value = 10000.0
+value = 1.0
+
+[node name="Label" type="Label" parent="UILayer/DiceRollPanel/HBoxContainer" unique_id=369167448]
+layout_mode = 2
+text = "d"
+
+[node name="SidesBox" type="SpinBox" parent="UILayer/DiceRollPanel/HBoxContainer" unique_id=1181197220]
+layout_mode = 2
+min_value = 2.0
+max_value = 100000.0
+value = 20.0
+
+[node name="Label2" type="Label" parent="UILayer/DiceRollPanel/HBoxContainer" unique_id=454884425]
+layout_mode = 2
+text = "+"
+
+[node name="ModBox" type="SpinBox" parent="UILayer/DiceRollPanel/HBoxContainer" unique_id=888166304]
+layout_mode = 2
+min_value = -10000.0
+max_value = 100000.0
+
+[node name="RollBtn" type="Button" parent="UILayer/DiceRollPanel/HBoxContainer" unique_id=400149953]
+layout_mode = 2
+text = "ROLL"
+
+[node name="WhisperCheck" type="CheckBox" parent="UILayer/DiceRollPanel/HBoxContainer" unique_id=330537922]
+layout_mode = 2
+text = "GM only"
+
+[node name="VSeparator" type="VSeparator" parent="UILayer/DiceRollPanel/HBoxContainer" unique_id=876557595]
+layout_mode = 2
+
+[node name="ResultLabel" type="Label" parent="UILayer/DiceRollPanel/HBoxContainer" unique_id=957497757]
+layout_mode = 2
+text = "Result: --"
+
+[node name="CodeQuestTracker" type="PanelContainer" parent="UILayer" unique_id=364131911]
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -500.0
+offset_top = -40.0
+offset_right = -177.0
+grow_horizontal = 2
+grow_vertical = 0
+script = ExtResource("7_d5o86")
 
 [connection signal="map_loaded" from="UILayer/GMDashboard" to="." method="_on_gm_dashboard_map_loaded"]
 [connection signal="map_scale_changed" from="UILayer/GMDashboard" to="." method="_on_gm_dashboard_map_scale_changed"]
 [connection signal="spawn_token_requested" from="UILayer/GMDashboard" to="." method="_on_gm_dashboard_spawn_token_requested"]
 [connection signal="tool_mode_changed" from="UILayer/GMDashboard" to="." method="_on_gm_dashboard_tool_mode_changed"]
-[connection signal="pressed" from="UILayer/InitiativeTracker/MarginContainer/VBoxContainer/RollInitBtn" to="." method="_on_roll_init_btn_pressed"]
+[connection signal="pressed" from="UILayer/TabContainer/InitiativeTracker/MarginContainer/VBoxContainer/RollInitBtn" to="." method="_on_roll_init_btn_pressed"]
+[connection signal="pressed" from="UILayer/TabContainer/InitiativeTracker/MarginContainer/VBoxContainer/ResetInitBtn" to="." method="_on_reset_init_btn_pressed"]
+[connection signal="pressed" from="UILayer/DiceRollPanel/HBoxContainer/RollBtn" to="." method="_on_roll_btn_pressed"]

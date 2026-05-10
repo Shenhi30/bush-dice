@@ -11,12 +11,15 @@ config_version=5
 [application]
 
 config/name="BushDice"
+run/main_scene="uid://dumt7s8nlqnjf"
 config/features=PackedStringArray("4.6", "Forward Plus")
 config/icon="res://icon.svg"
 
 [autoload]
 
 GameState="*uid://bdkelaevlcl3h"
+CampaignManager="*uid://wubqnymrd8h"
+NetworkManager="*uid://bhshmfunw3xiv"
 
 [file_customization]
 

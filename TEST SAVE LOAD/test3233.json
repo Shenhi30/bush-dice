@@ -1,0 +1,101 @@
+{
+	"active_scene_id": "Camp",
+	"campaign_name": "New Campaign",
+	"quests": [
+		{
+			"title": "kill bandits"
+		}
+	],
+	"scenes": {
+		"Camp": {
+			"map_image_path": "res://Assets/Maps/59x42.jpg",
+			"map_scale": 1.44,
+			"tokens": [
+				{
+					"art_path": "res://Assets/Tokens/6662c45a04d674e152f8da8a-removebg-preview.png",
+					"data": {
+						"ac": 10.0,
+						"current_init": 0,
+						"faction": "neutral",
+						"hp": 20,
+						"init_bonus": 2.0,
+						"is_dead": false,
+						"is_status_active": false,
+						"max_hp": 20,
+						"name": "Unknown",
+						"speed": 30.0,
+						"status_color": "c45500b2"
+					},
+					"height_offset": 0.0,
+					"x": 288.0,
+					"y": 416.0
+				},
+				{
+					"art_path": "res://Assets/Tokens/Laura.jpg",
+					"data": {
+						"ac": 10.0,
+						"current_init": 0,
+						"faction": "neutral",
+						"hp": 20,
+						"init_bonus": 2.0,
+						"is_dead": false,
+						"is_status_active": false,
+						"max_hp": 20,
+						"name": "Unknown",
+						"speed": 30.0,
+						"status_color": "c45500b2"
+					},
+					"height_offset": 0.0,
+					"x": 416.0,
+					"y": 416.0
+				}
+			],
+			"walls": []
+		},
+		"Village": {
+			"map_image_path": "res://Assets/Maps/120x130 vasen.jpg",
+			"map_scale": 2.11,
+			"tokens": [
+				{
+					"art_path": "",
+					"data": {
+						"ac": 10,
+						"current_init": 0,
+						"faction": "neutral",
+						"hp": 20,
+						"init_bonus": 2,
+						"is_dead": false,
+						"is_status_active": false,
+						"max_hp": 20,
+						"name": "Unknown",
+						"speed": 30,
+						"status_color": "c45500b2"
+					},
+					"height_offset": 0.0,
+					"x": -33.6737060546875,
+					"y": 385.243408203125
+				},
+				{
+					"art_path": "res://Assets/Tokens/Laura.jpg",
+					"data": {
+						"ac": 10,
+						"current_init": 0,
+						"faction": "neutral",
+						"hp": 20,
+						"init_bonus": 2,
+						"is_dead": false,
+						"is_status_active": false,
+						"max_hp": 20,
+						"name": "Unknown",
+						"speed": 30,
+						"status_color": "c45500b2"
+					},
+					"height_offset": 0.0,
+					"x": 480.0,
+					"y": 288.0
+				}
+			],
+			"walls": []
+		}
+	}
+}
