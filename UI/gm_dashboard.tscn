@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://s8h7e6g1q2ff" path="res://Scripts/GMDashboard.gd" id="1_rj5mt"]
 [ext_resource type="ButtonGroup" uid="uid://plv3shyiyxe3" path="res://ButtonGroups/Dashboard/ToolBtn.tres" id="2_qgoge"]
+[ext_resource type="PackedScene" uid="uid://bmcixwf6kn5dp" path="res://UI/TokenLibraryItem.tscn" id="3_sn0hj"]
 
 [node name="GMDashboard" type="CanvasLayer" unique_id=1538053333]
 script = ExtResource("1_rj5mt")
@@ -18,6 +19,10 @@ text = "🗺️ Map Library"
 layout_mode = 2
 text = "♟️ Token Library"
 
+[node name="OpenFoldersBtn" type="Button" parent="HBoxContainer" unique_id=1796114897]
+layout_mode = 2
+text = "Art Folder"
+
 [node name="VSeparator" type="VSeparator" parent="HBoxContainer" unique_id=1262882304]
 layout_mode = 2
 
@@ -27,6 +32,7 @@ min_value = -100.0
 
 [node name="EnemyCheckBox" type="CheckBox" parent="HBoxContainer" unique_id=848550990]
 layout_mode = 2
+text = "Enemy"
 
 [node name="ScaleMinusBtn" type="Button" parent="HBoxContainer" unique_id=231113454]
 custom_minimum_size = Vector2(30, 30)
@@ -69,10 +75,13 @@ oversampling_override = 1.0
 title = "Open a File"
 file_mode = 0
 access = 2
+filters = PackedStringArray("*.png", "*.jpg", "*.jpeg")
 
 [node name="TokenFileDialog" type="FileDialog" parent="." unique_id=433992924]
 title = "Open a File"
 file_mode = 0
+access = 2
+filters = PackedStringArray("*.png", "*.jpg", "*.jpeg")
 
 [node name="ToolPallete" type="PanelContainer" parent="." unique_id=1122663225]
 anchors_preset = 4
@@ -83,38 +92,56 @@ offset_right = 60.0
 offset_bottom = 324.0
 grow_vertical = 2
 
-[node name="VBoxContainer" type="VBoxContainer" parent="ToolPallete" unique_id=466218656]
+[node name="TabContainer" type="TabContainer" parent="ToolPallete" unique_id=1890078958]
 layout_mode = 2
+current_tab = 0
 
-[node name="Bypass Fog" type="CheckButton" parent="ToolPallete/VBoxContainer" unique_id=655872269]
+[node name="Tools" type="VBoxContainer" parent="ToolPallete/TabContainer" unique_id=466218656]
+layout_mode = 2
+metadata/_tab_index = 0
+
+[node name="Bypass Fog" type="CheckButton" parent="ToolPallete/TabContainer/Tools" unique_id=655872269]
 layout_mode = 2
 focus_mode = 0
 text = "Fog"
 
-[node name="SelectToolBtn" type="Button" parent="ToolPallete/VBoxContainer" unique_id=1257527462]
+[node name="SelectToolBtn" type="Button" parent="ToolPallete/TabContainer/Tools" unique_id=1257527462]
 layout_mode = 2
 toggle_mode = true
 button_pressed = true
 button_group = ExtResource("2_qgoge")
 text = "Select"
 
-[node name="WallToolBtn" type="Button" parent="ToolPallete/VBoxContainer" unique_id=885837300]
+[node name="WallToolBtn" type="Button" parent="ToolPallete/TabContainer/Tools" unique_id=885837300]
 layout_mode = 2
 toggle_mode = true
 button_group = ExtResource("2_qgoge")
 text = "Wall"
 
-[node name="EraseWallBtn" type="Button" parent="ToolPallete/VBoxContainer" unique_id=1959817186]
+[node name="EraseWallBtn" type="Button" parent="ToolPallete/TabContainer/Tools" unique_id=1959817186]
 layout_mode = 2
 toggle_mode = true
 button_group = ExtResource("2_qgoge")
 text = "Erase"
 
-[node name="MeasureToolBtn" type="Button" parent="ToolPallete/VBoxContainer" unique_id=2091086774]
+[node name="MeasureToolBtn" type="Button" parent="ToolPallete/TabContainer/Tools" unique_id=2091086774]
 layout_mode = 2
 toggle_mode = true
 button_group = ExtResource("2_qgoge")
 text = "Ruler"
+
+[node name="Party" type="VBoxContainer" parent="ToolPallete/TabContainer" unique_id=1570973544]
+visible = false
+layout_mode = 2
+metadata/_tab_index = 1
+
+[node name="SpawnPartyBtn" type="Button" parent="ToolPallete/TabContainer/Party" unique_id=90411987]
+visible = false
+layout_mode = 2
+text = "Drop entire party"
+
+[node name="PartyList" type="VBoxContainer" parent="ToolPallete/TabContainer/Party" unique_id=2084023316]
+layout_mode = 2
 
 [node name="MapDrawer" type="PanelContainer" parent="." unique_id=1767252311]
 visible = false
@@ -150,6 +177,7 @@ visible = false
 custom_minimum_size = Vector2(400, 300)
 offset_right = 40.0
 offset_bottom = 40.0
+mouse_filter = 1
 
 [node name="VBoxContainer" type="VBoxContainer" parent="TokenDrawer" unique_id=791810256]
 layout_mode = 2
@@ -175,6 +203,9 @@ size_flags_vertical = 3
 layout_mode = 2
 columns = 4
 
+[node name="TextureRect" parent="TokenDrawer/VBoxContainer/ScrollContainer/TokenGrid" unique_id=660648118 instance=ExtResource("3_sn0hj")]
+layout_mode = 2
+
 [node name="SaveFileDialog" type="FileDialog" parent="." unique_id=1442769507]
 access = 2
 filters = PackedStringArray("*.json")
@@ -187,13 +218,18 @@ access = 2
 filters = PackedStringArray("*.json")
 
 [node name="RenameDialog" type="ConfirmationDialog" parent="." unique_id=909496590]
+oversampling_override = 1.0
 title = "Rename Scene"
+size = Vector2i(216, 100)
 
 [node name="NewNameInput" type="LineEdit" parent="RenameDialog" unique_id=16037894]
 custom_minimum_size = Vector2(200, 0)
-offset_right = 68.5
-offset_bottom = 31.0
+offset_left = 8.0
+offset_top = 8.0
+offset_right = 208.0
+offset_bottom = 51.0
 
+[connection signal="pressed" from="HBoxContainer/OpenFoldersBtn" to="." method="_on_open_folders_btn_pressed"]
 [connection signal="button_down" from="HBoxContainer/ScaleMinusBtn" to="." method="_on_scale_minus_btn_button_down"]
 [connection signal="button_up" from="HBoxContainer/ScaleMinusBtn" to="." method="_on_scale_minus_btn_button_up"]
 [connection signal="pressed" from="HBoxContainer/ScaleMinusBtn" to="." method="_on_scale_minus_btn_pressed"]
@@ -201,8 +237,12 @@ offset_bottom = 31.0
 [connection signal="button_down" from="HBoxContainer/ScalePlusBtn" to="." method="_on_scale_plus_btn_button_down"]
 [connection signal="button_up" from="HBoxContainer/ScalePlusBtn" to="." method="_on_scale_plus_btn_button_up"]
 [connection signal="pressed" from="HBoxContainer/ScalePlusBtn" to="." method="_on_scale_plus_btn_pressed"]
-[connection signal="toggled" from="ToolPallete/VBoxContainer/Bypass Fog" to="." method="_on_bypass_fog_toggled"]
-[connection signal="toggled" from="ToolPallete/VBoxContainer/SelectToolBtn" to="." method="_on_select_tool_btn_toggled"]
-[connection signal="toggled" from="ToolPallete/VBoxContainer/WallToolBtn" to="." method="_on_wall_tool_btn_toggled"]
-[connection signal="toggled" from="ToolPallete/VBoxContainer/EraseWallBtn" to="." method="_on_erase_wall_btn_toggled"]
-[connection signal="toggled" from="ToolPallete/VBoxContainer/MeasureToolBtn" to="." method="_on_measure_tool_btn_toggled"]
+[connection signal="file_selected" from="MapFileDialog" to="." method="_on_map_file_dialog_file_selected"]
+[connection signal="file_selected" from="TokenFileDialog" to="." method="_on_token_file_dialog_file_selected"]
+[connection signal="toggled" from="ToolPallete/TabContainer/Tools/Bypass Fog" to="." method="_on_bypass_fog_toggled"]
+[connection signal="toggled" from="ToolPallete/TabContainer/Tools/SelectToolBtn" to="." method="_on_select_tool_btn_toggled"]
+[connection signal="toggled" from="ToolPallete/TabContainer/Tools/WallToolBtn" to="." method="_on_wall_tool_btn_toggled"]
+[connection signal="toggled" from="ToolPallete/TabContainer/Tools/EraseWallBtn" to="." method="_on_erase_wall_btn_toggled"]
+[connection signal="toggled" from="ToolPallete/TabContainer/Tools/MeasureToolBtn" to="." method="_on_measure_tool_btn_toggled"]
+[connection signal="pressed" from="MapDrawer/VBoxContainer/TopControls/ImportMapBtn" to="." method="_on_import_map_btn_pressed"]
+[connection signal="pressed" from="TokenDrawer/VBoxContainer/TopControls/ImportTokenBtn" to="." method="_on_import_token_btn_pressed"]

@@ -5,6 +5,7 @@
 [ext_resource type="Script" uid="uid://b3x8hfopbgjdh" path="res://Scripts/GridOverlay.gd" id="3_d5o86"]
 [ext_resource type="Script" uid="uid://ot0uea5lnjo8" path="res://Scripts/CameraControls.gd" id="4_njf4n"]
 [ext_resource type="PackedScene" uid="uid://rq2pa5oxxsa1" path="res://UI/gm_dashboard.tscn" id="4_u7eij"]
+[ext_resource type="Script" uid="uid://dbvpg2fnr187e" path="res://Scripts/DropZone.gd" id="5_d5o86"]
 [ext_resource type="Script" uid="uid://5utvh4al0krb" path="res://Scripts/QuestTracker.gd" id="7_d5o86"]
 
 [sub_resource type="Gradient" id="Gradient_m4kfr"]
@@ -16,7 +17,7 @@ height = 1
 fill = 1
 fill_from = Vector2(0.5, 0.4764706)
 
-[node name="MainBoard" type="Node2D" unique_id=1607257795]
+[node name="MainBoard" type="Node2D" unique_id=1607257795 groups=["board"]]
 script = ExtResource("1_ockhe")
 
 [node name="MapLayer" type="Node2D" parent="." unique_id=795627312]
@@ -38,11 +39,10 @@ texture = SubResource("GradientTexture2D_d5o86")
 [node name="TokenLayer" type="Node2D" parent="." unique_id=2085070927]
 
 [node name="Token" parent="TokenLayer" unique_id=1895161753 instance=ExtResource("2_6bsxh")]
-visible = false
-position = Vector2(-33.673706, 385.2434)
+position = Vector2(-193, 416)
 
 [node name="Darkness" type="CanvasModulate" parent="." unique_id=1358517977]
-color = Color(0.039215688, 0.039215688, 0.101960786, 1)
+color = Color(0.0013913607, 0.0013913607, 0.0046378695, 1)
 
 [node name="GMCamera" type="Camera2D" parent="." unique_id=1675156281]
 script = ExtResource("4_njf4n")
@@ -51,6 +51,7 @@ script = ExtResource("4_njf4n")
 layer = 10
 
 [node name="GMDashboard" parent="UILayer" unique_id=1538053333 instance=ExtResource("4_u7eij")]
+layer = 11
 
 [node name="TabContainer" type="TabContainer" parent="UILayer" unique_id=1725244790]
 anchors_preset = 1
@@ -59,11 +60,11 @@ anchor_right = 1.0
 offset_left = -155.0
 offset_bottom = 648.0
 grow_horizontal = 0
-current_tab = 1
+current_tab = 0
 
 [node name="InitiativeTracker" type="PanelContainer" parent="UILayer/TabContainer" unique_id=808262133]
-visible = false
 layout_mode = 2
+mouse_filter = 1
 metadata/_tab_index = 0
 
 [node name="MarginContainer" type="MarginContainer" parent="UILayer/TabContainer/InitiativeTracker" unique_id=1488440711]
@@ -94,7 +95,9 @@ layout_mode = 2
 layout_mode = 2
 
 [node name="ChatPanel" type="Panel" parent="UILayer/TabContainer" unique_id=1959821814]
+visible = false
 layout_mode = 2
+mouse_filter = 1
 metadata/_tab_index = 1
 
 [node name="VBoxContainer" type="VBoxContainer" parent="UILayer/TabContainer/ChatPanel" unique_id=401390300]
@@ -126,6 +129,7 @@ flat = true
 [node name="PlayerListPanel" type="Panel" parent="UILayer/TabContainer" unique_id=1391938670]
 visible = false
 layout_mode = 2
+mouse_filter = 1
 metadata/_tab_index = 2
 
 [node name="PlayerContainer" type="VBoxContainer" parent="UILayer/TabContainer/PlayerListPanel" unique_id=710236949]
@@ -145,6 +149,7 @@ offset_top = -40.0
 offset_right = 405.0
 grow_horizontal = 2
 grow_vertical = 0
+mouse_filter = 1
 
 [node name="HBoxContainer" type="HBoxContainer" parent="UILayer/DiceRollPanel" unique_id=1282694786]
 layout_mode = 2
@@ -200,7 +205,21 @@ offset_top = -40.0
 offset_right = -177.0
 grow_horizontal = 2
 grow_vertical = 0
+mouse_filter = 1
 script = ExtResource("7_d5o86")
+
+[node name="BackgroundDropLayer" type="CanvasLayer" parent="." unique_id=471475110]
+layer = 9
+
+[node name="DropZone" type="Control" parent="BackgroundDropLayer" unique_id=576933097]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+script = ExtResource("5_d5o86")
 
 [connection signal="map_loaded" from="UILayer/GMDashboard" to="." method="_on_gm_dashboard_map_loaded"]
 [connection signal="map_scale_changed" from="UILayer/GMDashboard" to="." method="_on_gm_dashboard_map_scale_changed"]

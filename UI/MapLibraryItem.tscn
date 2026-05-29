@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://bk7oucrfxsa6h"]
+
+[ext_resource type="Script" uid="uid://bdgeq4dgkpyhq" path="res://Scripts/map_library_item.gd" id="1_f73o4"]
+
+[node name="MapLibraryItem" type="TextureRect" unique_id=1802454340]
+script = ExtResource("1_f73o4")

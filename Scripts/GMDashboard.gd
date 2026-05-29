@@ -9,6 +9,8 @@ signal load_requested(file_path: String)
 signal scene_switched(new_scene_id: String)
 signal create_new_scene_requested()
 signal rename_scene_requested(new_name: String)
+signal fog_bypass_toggled(is_bypassed: bool)
+signal spawn_party_requested
 
 # --- DRAWER NODES ---
 @onready var map_drawer = $MapDrawer
@@ -26,6 +28,10 @@ signal rename_scene_requested(new_name: String)
 @onready var scene_dropdown = $HBoxContainer/SceneDropdown
 @onready var add_scene_btn = $HBoxContainer/AddSceneBtn
 
+@onready var spawn_party_btn = $ToolPallete/TabContainer/Party/SpawnPartyBtn
+@onready var party_container = $ToolPallete/TabContainer/Party
+
+@onready var party_list = $ToolPallete/TabContainer/Party/PartyList
 # -- RENAME --
 @onready var rename_btn = $HBoxContainer/RenameSceneBtn
 @onready var rename_dialog = $RenameDialog
@@ -79,8 +85,10 @@ func _ready():
 	
 	save_file_dialog.file_selected.connect(func(path): save_requested.emit(path))
 	load_file_dialog.file_selected.connect(func(path): load_requested.emit(path))
+	spawn_party_btn.pressed.connect(func(): spawn_party_requested.emit())
 	
-	
+	refresh_party_ui()
+	refresh_token_library()
 	# --- SCENE SWITCHER LOGIC ---
 	# 1. Fill the dropdown with scenes from the CampaignManager
 	scene_dropdown.clear()
@@ -111,8 +119,6 @@ func _ready():
 		if new_name != "":
 			rename_scene_requested.emit(new_name)
 	)
-
-
 
 
 func _process(delta: float):
@@ -164,6 +170,134 @@ func _create_image_button(image_path: String, grid: GridContainer, is_map: bool)
 	
 	grid.add_child(btn)
 
+func refresh_token_library():
+	# 1. Clear the old icons
+	for child in token_grid.get_children():
+		child.queue_free()
+	
+	# 2. Open the user folder
+	var path = "user://tokens/"
+	var dir = DirAccess.open(path)
+	if dir:
+		dir.list_dir_begin()
+		var file_name = dir.get_next()
+		if file_name == "":
+			print("The scanner found NOTHING in " + path)
+		while file_name != "":
+			print("Scanner found file: " + file_name) # This tells you it's working!
+			# 3. Only pick image files
+			if file_name.to_lower().ends_with(".png") or file_name.to_lower().ends_with(".jpg"):
+				spawn_library_icon(path + file_name)
+			
+			file_name = dir.get_next()
+	else:
+		print("Error: Could not find user://tokens folder!")
+
+func spawn_library_icon(file_path: String):
+	
+	# 4. Use your new UI template
+	var icon_scene = preload("res://UI/TokenLibraryItem.tscn")
+	var new_item = icon_scene.instantiate()
+	
+	# 1. Load the raw data from the hard drive
+	var img = Image.load_from_file(file_path)
+	
+	# 2. Convert it into a texture the UI can use
+	var tex = ImageTexture.create_from_image(img)
+	
+	# 1. Set the image on the Icon node
+	var icon_node = new_item.get_node("Icon")
+	icon_node.texture = tex
+	icon_node.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon_node.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon_node.custom_minimum_size = Vector2(80, 80)
+	
+	# 2. Set the Name Label! 
+	# get_basename() removes the ".png" so "Guard.png" becomes "Guard"
+	var file_name = file_path.get_file().get_basename() 
+	var label_node = new_item.get_node("NameLabel")
+	label_node.text = file_name
+	label_node.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	
+	new_item.token_image_path = file_path
+	token_grid.add_child(new_item)
+
+func refresh_map_library():
+	for child in map_grid.get_children():
+		child.queue_free()
+		
+	var path = "user://maps/"
+	var dir = DirAccess.open(path)
+	
+	if dir:
+		dir.list_dir_begin()
+		var file_name = dir.get_next()
+		
+		while file_name != "":
+			if not dir.current_is_dir() and (file_name.ends_with(".png") or file_name.ends_with(".jpg")):
+				spawn_map_icon(path + file_name)
+			file_name = dir.get_next()
+
+# 4. Create the drawer icon
+func spawn_map_icon(file_path: String):
+	var icon_scene = preload("res://UI/MapLibraryItem.tscn")
+	var new_icon = icon_scene.instantiate()
+	
+	var img = Image.load_from_file(file_path)
+	new_icon.texture = ImageTexture.create_from_image(img)
+	
+	# Maps usually look better as wide rectangles
+	new_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	new_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	new_icon.custom_minimum_size = Vector2(150, 100) 
+	
+	new_icon.map_image_path = file_path
+	map_grid.add_child(new_icon)
+
+func refresh_party_ui():
+	# 1. Clear the old list
+	if not party_list: return
+	for child in party_list.get_children():
+		child.queue_free()
+		
+	var vault = CampaignManager.campaign_data.get("pc_vault", {})
+	
+	# 2. Build a row for every player character
+	for pc_name in vault.keys():
+		var pc_data = vault[pc_name]
+		var row = HBoxContainer.new()
+		
+		# A. The Portrait
+		var portrait = TextureRect.new()
+		var img = Image.load_from_file(pc_data["art_path"])
+		if img:
+			portrait.texture = ImageTexture.create_from_image(img)
+		portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		portrait.custom_minimum_size = Vector2(40, 40) # Small UI size
+		portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		row.add_child(portrait)
+		
+		# B. The Name Label
+		var name_lbl = Label.new()
+		name_lbl.text = pc_name
+		name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL # Pushes the spawn button to the right
+		row.add_child(name_lbl)
+		
+		# C. The Individual Spawn Button
+		var spawn_btn = Button.new()
+		spawn_btn.text = "Spawn"
+		spawn_btn.pressed.connect(func():
+			var main_board = get_tree().get_first_node_in_group("board")
+			if main_board:
+				main_board.spawn_single_vault_token(pc_name, main_board.get_node("GMCamera").global_position)
+		)
+		row.add_child(spawn_btn)
+		
+		# 3. Add the complete row to the drawer
+		party_list.add_child(row)
+
+
+
 # Connect the "pressed" signal from your Minus button to this
 func _on_scale_minus_btn_pressed() -> void:
 	# Nudge the scale down by 0.05 (adjust this step to your liking!)
@@ -178,9 +312,7 @@ func _on_map_scale_spin_box_value_changed(value: float) -> void:
 	map_scale_changed.emit(value)
 
 func _on_bypass_fog_toggled(toggled_on: bool) -> void:
-	GameState.is_gm_mode = toggled_on
-	GameState.gm_mode_changed.emit(toggled_on)
-
+	fog_bypass_toggled.emit(toggled_on)
 
 func _on_scale_minus_btn_button_down():
 	is_holding_minus = true
@@ -217,3 +349,48 @@ func _on_measure_tool_btn_toggled(toggled_on: bool) -> void:
 func _on_scene_dropdown_selected(index: int):
 	var selected_scene_id = scene_dropdown.get_item_text(index)
 	scene_switched.emit(selected_scene_id)
+
+func _on_open_folders_btn_pressed() -> void:
+	# 1. Translate the safe 'user://' path into a real Windows/Mac/Linux path
+	var absolute_path = ProjectSettings.globalize_path("user://")
+	
+	# 2. Command the operating system to open it in their native File Explorer!
+	OS.shell_open(absolute_path)
+
+func _on_import_token_btn_pressed() -> void:
+	$TokenFileDialog.popup_centered()
+
+func _on_token_file_dialog_file_selected(path: String) -> void:
+	# 1. Get the filename (e.g., "bounty_hunter.png")
+	var file_name = path.get_file()
+	var destination = "user://tokens/" + file_name
+	
+	# 2. Copy the file into your internal library
+	# We use copy_absolute because the original file is outside the project
+	var err = DirAccess.copy_absolute(path, destination)
+	
+	if err == OK:
+		print("Import Successful: ", file_name)
+		# 3. Trigger your scanner to update the UI
+		refresh_token_library()
+	else:
+		print("Import Failed! Error code: ", err)
+
+func _on_map_file_dialog_file_selected(path: String) -> void:
+		# 1. Get the filename (e.g., "bounty_hunter.png")
+	var file_name = path.get_file()
+	var destination = "user://maps/" + file_name
+	
+	# 2. Copy the file into your internal library
+	# We use copy_absolute because the original file is outside the project
+	var err = DirAccess.copy_absolute(path, destination)
+	
+	if err == OK:
+		print("Import Successful: ", file_name)
+		# 3. Trigger your scanner to update the UI
+		refresh_map_library()
+	else:
+		print("Import Failed! Error code: ", err)
+
+func _on_import_map_btn_pressed() -> void:
+	$MapFileDialog.popup_centered()

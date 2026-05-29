@@ -1,6 +1,28 @@
 {
 	"active_scene_id": "map_1",
 	"campaign_name": "New Campaign",
+	"pc_vault": {
+		"Unknown": {
+			"art_path": "res://Assets/Tokens/Laura.jpg",
+			"data": {
+				"ac": 10.0,
+				"current_init": 0.0,
+				"faction": "neutral",
+				"hp": 20.0,
+				"init_bonus": 2.0,
+				"is_dead": false,
+				"is_hiden": false,
+				"is_status_active": false,
+				"light_radius": 0.0,
+				"max_hp": 20.0,
+				"name": "Unknown",
+				"owner_id": "test1",
+				"speed": 30.0,
+				"status_color": "c45500b2"
+			},
+			"height_offset": 0.0
+		}
+	},
 	"quests": [
 		{
 			"title": "kill"
@@ -27,7 +49,7 @@
 						"status_color": "c45500b2"
 					},
 					"height_offset": 0.0,
-					"name": "@CharacterBody2D@917",
+					"name": "_CharacterBody2D_917",
 					"x": -544.0,
 					"y": 352.0
 				},
@@ -43,13 +65,14 @@
 						"is_status_active": false,
 						"max_hp": 20.0,
 						"name": "Unknown",
+						"owner_id": "astrit",
 						"speed": 30.0,
 						"status_color": "c45500b2"
 					},
 					"height_offset": 0.0,
-					"name": "@CharacterBody2D@930",
-					"x": 352.0,
-					"y": 672.0
+					"name": "_CharacterBody2D_930",
+					"x": 288.0,
+					"y": 416.0
 				},
 				{
 					"art_path": "res://Assets/Tokens/6662c45a04d674e152f8da8a-removebg-preview.png",
@@ -63,16 +86,99 @@
 						"is_status_active": false,
 						"max_hp": 20.0,
 						"name": "Unknown",
+						"owner_id": "gospoza",
 						"speed": 30.0,
 						"status_color": "c45500b2"
 					},
 					"height_offset": 0.0,
-					"name": "@CharacterBody2D@943",
+					"name": "_CharacterBody2D_943",
+					"x": 864.0,
+					"y": 672.0
+				},
+				{
+					"art_path": "res://Assets/Tokens/Laura.jpg",
+					"data": {
+						"ac": 10.0,
+						"current_init": 0.0,
+						"faction": "neutral",
+						"hp": 20.0,
+						"init_bonus": 2.0,
+						"is_dead": false,
+						"is_hiden": false,
+						"is_status_active": false,
+						"light_radius": 0.0,
+						"max_hp": 20.0,
+						"name": "Unknown",
+						"owner_id": "test1",
+						"speed": 30.0,
+						"status_color": "c45500b2"
+					},
+					"height_offset": 0.0,
+					"name": "Token_84736_50",
+					"x": 160.0,
+					"y": 160.0
+				},
+				{
+					"art_path": "res://Assets/Tokens/Laura.jpg",
+					"data": {
+						"ac": 10.0,
+						"current_init": 0.0,
+						"faction": "neutral",
+						"hp": 20.0,
+						"init_bonus": 2.0,
+						"is_dead": false,
+						"is_hiden": false,
+						"is_status_active": false,
+						"light_radius": 0.0,
+						"max_hp": 20.0,
+						"name": "Unknown",
+						"owner_id": "test1",
+						"speed": 30.0,
+						"status_color": "c45500b2"
+					},
+					"height_offset": 0.0,
+					"name": "Token_120116_772",
 					"x": 480.0,
-					"y": 544.0
+					"y": 160.0
+				},
+				{
+					"art_path": "res://Assets/Tokens/Laura.jpg",
+					"data": {
+						"ac": 10.0,
+						"current_init": 0.0,
+						"faction": "neutral",
+						"hp": 20.0,
+						"init_bonus": 2.0,
+						"is_dead": false,
+						"is_hiden": false,
+						"is_status_active": false,
+						"light_radius": 0.0,
+						"max_hp": 20.0,
+						"name": "Unknown",
+						"owner_id": "test1",
+						"speed": 30.0,
+						"status_color": "c45500b2"
+					},
+					"height_offset": 0.0,
+					"name": "Token_120616_227",
+					"x": 243.819320678711,
+					"y": 297.995086669922
 				}
 			],
-			"walls": []
+			"walls": [
+				{
+					"end_x": 449.535705566406,
+					"end_y": 506.380920410156,
+					"start_x": 445.091247558594,
+					"start_y": 625.269775390625
+				},
+				{
+					"end_x": 383.980102539063,
+					"end_y": 510.825317382813,
+					"start_x": 449.535705566406,
+					"start_y": 506.380920410156
+				}
+			]
 		},
 		"map_2": {
 			"map_image_path": "res://Assets/Maps/59x42.jpg",
@@ -87,16 +193,18 @@
 						"hp": 20.0,
 						"init_bonus": 2.0,
 						"is_dead": false,
+						"is_hidden": false,
 						"is_status_active": false,
 						"max_hp": 20.0,
 						"name": "Unknown",
+						"owner_id": "gospoza",
 						"speed": 30.0,
 						"status_color": "c45500b2"
 					},
 					"height_offset": 0.0,
 					"name": "Token_77298_4953",
-					"x": 288.0,
-					"y": 352.0
+					"x": 416.0,
+					"y": 288.0
 				},
 				{
 					"art_path": "res://Assets/Tokens/6662c45a04d674e152f8da8a-removebg-preview.png",
@@ -110,16 +218,65 @@
 						"is_status_active": false,
 						"max_hp": 20.0,
 						"name": "Unknown",
+						"owner_id": "astrit",
 						"speed": 30.0,
 						"status_color": "c45500b2"
 					},
 					"height_offset": 0.0,
 					"name": "Token_81885_5676",
-					"x": 288.0,
-					"y": 224.0
+					"x": 224.0,
+					"y": 288.0
+				},
+				{
+					"art_path": "res://Assets/Tokens/Laura.jpg",
+					"data": {
+						"ac": 10.0,
+						"current_init": 0.0,
+						"faction": "neutral",
+						"hp": 20.0,
+						"init_bonus": 2.0,
+						"is_dead": false,
+						"is_hiden": false,
+						"is_status_active": false,
+						"light_radius": 0.0,
+						"max_hp": 20.0,
+						"name": "Unknown",
+						"owner_id": "test1",
+						"speed": 30.0,
+						"status_color": "c45500b2"
+					},
+					"height_offset": 0.0,
+					"name": "Token_64851_5701",
+					"x": 224.0,
+					"y": 160.0
 				}
 			],
-			"walls": []
+			"walls": [
+				{
+					"end_x": 260.646789550781,
+					"end_y": 328.603179931641,
+					"start_x": 185.091247558594,
+					"start_y": 324.158752441406
+				},
+				{
+					"end_x": 261.757934570313,
+					"end_y": 237.492065429688,
+					"start_x": 260.646789550781,
+					"start_y": 328.603179931641
+				},
+				{
+					"end_x": 185.091247558594,
+					"end_y": 241.936508178711,
+					"start_x": 261.757934570313,
+					"start_y": 237.492065429688
+				},
+				{
+					"end_x": 188.424560546875,
+					"end_y": 329.714294433594,
+					"start_x": 187.313446044922,
+					"start_y": 240.825408935547
+				}
+			]
 		}
 	}
 }

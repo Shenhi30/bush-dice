@@ -1,0 +1,59 @@
+{
+	"active_scene_id": "default_map",
+	"campaign_name": "New Campaign",
+	"pc_vault": {
+		"Unknown": {
+			"art_path": "",
+			"data": {
+				"ac": 10,
+				"current_init": 0,
+				"faction": "neutral",
+				"hp": 20,
+				"init_bonus": 2,
+				"is_dead": false,
+				"is_hiden": false,
+				"is_status_active": false,
+				"light_radius": 0.0,
+				"max_hp": 20,
+				"name": "Unknown",
+				"owner_id": 1,
+				"speed": 30,
+				"status_color": "c45500b2"
+			},
+			"height_offset": 0.0
+		}
+	},
+	"quests": [],
+	"scenes": {
+		"default_map": {
+			"map_image_path": "res://Assets/Maps/AdvGuild.jpg",
+			"map_scale": 1.0,
+			"tokens": [
+				{
+					"art_path": "",
+					"data": {
+						"ac": 10,
+						"current_init": 0,
+						"faction": "neutral",
+						"hp": 20,
+						"init_bonus": 2,
+						"is_dead": false,
+						"is_hiden": false,
+						"is_status_active": false,
+						"light_radius": 0.0,
+						"max_hp": 20,
+						"name": "Unknown",
+						"owner_id": 1,
+						"speed": 30,
+						"status_color": "c45500b2"
+					},
+					"height_offset": 0.0,
+					"name": "Token",
+					"x": -193.0,
+					"y": 416.0
+				}
+			],
+			"walls": []
+		}
+	}
+}

@@ -1,98 +1,125 @@
 {
-	"active_scene_id": "Camp",
+	"active_scene_id": "default_map",
 	"campaign_name": "New Campaign",
-	"quests": [
-		{
-			"title": "kill bandits"
+	"pc_vault": {
+		"Unknown": {
+			"art_path": "res://Assets/Tokens/Laura.jpg",
+			"data": {
+				"ac": 10.0,
+				"current_init": 0.0,
+				"faction": "neutral",
+				"hp": 20.0,
+				"init_bonus": 2.0,
+				"is_dead": false,
+				"is_hiden": false,
+				"is_status_active": false,
+				"light_radius": 0.0,
+				"max_hp": 20.0,
+				"name": "Unknown",
+				"owner_id": "Dave",
+				"speed": 30.0,
+				"status_color": "c45500b2"
+			},
+			"height_offset": 0.0
 		}
-	],
+	},
+	"quests": [],
 	"scenes": {
-		"Camp": {
-			"map_image_path": "res://Assets/Maps/59x42.jpg",
-			"map_scale": 1.44,
-			"tokens": [
-				{
-					"art_path": "res://Assets/Tokens/6662c45a04d674e152f8da8a-removebg-preview.png",
-					"data": {
-						"ac": 10.0,
-						"current_init": 0,
-						"faction": "neutral",
-						"hp": 20,
-						"init_bonus": 2.0,
-						"is_dead": false,
-						"is_status_active": false,
-						"max_hp": 20,
-						"name": "Unknown",
-						"speed": 30.0,
-						"status_color": "c45500b2"
-					},
-					"height_offset": 0.0,
-					"x": 288.0,
-					"y": 416.0
-				},
-				{
-					"art_path": "res://Assets/Tokens/Laura.jpg",
-					"data": {
-						"ac": 10.0,
-						"current_init": 0,
-						"faction": "neutral",
-						"hp": 20,
-						"init_bonus": 2.0,
-						"is_dead": false,
-						"is_status_active": false,
-						"max_hp": 20,
-						"name": "Unknown",
-						"speed": 30.0,
-						"status_color": "c45500b2"
-					},
-					"height_offset": 0.0,
-					"x": 416.0,
-					"y": 416.0
-				}
-			],
-			"walls": []
-		},
-		"Village": {
+		"default_map": {
 			"map_image_path": "res://Assets/Maps/120x130 vasen.jpg",
-			"map_scale": 2.11,
+			"map_scale": 1.0,
 			"tokens": [
 				{
 					"art_path": "",
 					"data": {
-						"ac": 10,
-						"current_init": 0,
+						"ac": 10.0,
+						"current_init": 0.0,
 						"faction": "neutral",
-						"hp": 20,
-						"init_bonus": 2,
+						"hp": 20.0,
+						"init_bonus": 2.0,
 						"is_dead": false,
+						"is_hiden": false,
 						"is_status_active": false,
-						"max_hp": 20,
+						"light_radius": 0.0,
+						"max_hp": 20.0,
 						"name": "Unknown",
-						"speed": 30,
+						"owner_id": 1.0,
+						"speed": 30.0,
 						"status_color": "c45500b2"
 					},
 					"height_offset": 0.0,
-					"x": -33.6737060546875,
-					"y": 385.243408203125
+					"name": "@CharacterBody2D@662",
+					"x": -193.0,
+					"y": 416.0
 				},
 				{
 					"art_path": "res://Assets/Tokens/Laura.jpg",
 					"data": {
-						"ac": 10,
-						"current_init": 0,
+						"ac": 10.0,
+						"current_init": 0.0,
 						"faction": "neutral",
-						"hp": 20,
-						"init_bonus": 2,
+						"hp": 20.0,
+						"init_bonus": 2.0,
 						"is_dead": false,
+						"is_hiden": false,
 						"is_status_active": false,
-						"max_hp": 20,
+						"light_radius": 0.0,
+						"max_hp": 20.0,
 						"name": "Unknown",
-						"speed": 30,
+						"owner_id": "Dave",
+						"speed": 30.0,
 						"status_color": "c45500b2"
 					},
 					"height_offset": 0.0,
-					"x": 480.0,
+					"name": "Token_4982_3485",
+					"x": 224.0,
 					"y": 288.0
+				},
+				{
+					"art_path": "res://Assets/Tokens/Laura.jpg",
+					"data": {
+						"ac": 10.0,
+						"current_init": 0.0,
+						"faction": "neutral",
+						"hp": 20.0,
+						"init_bonus": 2.0,
+						"is_dead": false,
+						"is_hiden": false,
+						"is_status_active": false,
+						"light_radius": 0.0,
+						"max_hp": 20.0,
+						"name": "Unknown",
+						"owner_id": "Dave",
+						"speed": 30.0,
+						"status_color": "c45500b2"
+					},
+					"height_offset": 0.0,
+					"name": "Token_25486_636",
+					"x": 480.0,
+					"y": 160.0
+				},
+				{
+					"art_path": "res://Assets/Tokens/Laura.jpg",
+					"data": {
+						"ac": 10.0,
+						"current_init": 0.0,
+						"faction": "neutral",
+						"hp": 20.0,
+						"init_bonus": 2.0,
+						"is_dead": false,
+						"is_hiden": false,
+						"is_status_active": false,
+						"light_radius": 0.0,
+						"max_hp": 20.0,
+						"name": "Unknown",
+						"owner_id": "Dave",
+						"speed": 30.0,
+						"status_color": "c45500b2"
+					},
+					"height_offset": 0.0,
+					"name": "Token_26904_541",
+					"x": 352.0,
+					"y": 160.0
 				}
 			],
 			"walls": []

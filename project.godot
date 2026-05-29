@@ -11,7 +11,8 @@ config_version=5
 [application]
 
 config/name="BushDice"
-run/main_scene="uid://dumt7s8nlqnjf"
+config/version="0.8"
+run/main_scene="uid://x4os0solslq1"
 config/features=PackedStringArray("4.6", "Forward Plus")
 config/icon="res://icon.svg"
 
@@ -20,6 +21,11 @@ config/icon="res://icon.svg"
 GameState="*uid://bdkelaevlcl3h"
 CampaignManager="*uid://wubqnymrd8h"
 NetworkManager="*uid://bhshmfunw3xiv"
+Supabase="*uid://cg2ofs0743kte"
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/supabase/plugin.cfg")
 
 [file_customization]
 
@@ -74,3 +80,8 @@ ui_down={
 [rendering]
 
 rendering_device/driver.windows="d3d12"
+
+[supabase]
+
+config/supabaseUrl="https://jjhmxtuwvjddcuwouebf.supabase.co"
+config/supabaseKey="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpqaG14dHV3dmpkZGN1d291ZWJmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0NzgwNzMsImV4cCI6MjA5NDA1NDA3M30.vR0q7fuDYJrqwR02orpuYv7uan9SthfdbqPxdmWhNXE"

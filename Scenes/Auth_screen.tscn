@@ -1,0 +1,51 @@
+[gd_scene format=3 uid="uid://x4os0solslq1"]
+
+[ext_resource type="Script" uid="uid://10t4ega3vugo" path="res://Scripts/Auth_screen.gd" id="1_f51bv"]
+
+[node name="AuthScreen" type="Control" unique_id=822288732]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 1153.0
+offset_bottom = 649.0
+script = ExtResource("1_f51bv")
+
+[node name="Panel" type="ColorRect" parent="." unique_id=870567962]
+layout_mode = 0
+offset_right = 1153.0
+offset_bottom = 649.0
+color = Color(0.6052743, 0.6052743, 0.6052743, 1)
+
+[node name="VBoxContainer" type="VBoxContainer" parent="." unique_id=302413533]
+layout_mode = 0
+offset_left = 350.0
+offset_top = 103.0
+offset_right = 786.0
+offset_bottom = 539.0
+
+[node name="UsernameInput" type="LineEdit" parent="VBoxContainer" unique_id=1977807239]
+layout_mode = 2
+placeholder_text = "PlayerName"
+
+[node name="EmailInput" type="LineEdit" parent="VBoxContainer" unique_id=778961227]
+layout_mode = 2
+placeholder_text = "Email"
+
+[node name="PasswordInput" type="LineEdit" parent="VBoxContainer" unique_id=1370757318]
+layout_mode = 2
+placeholder_text = "Password"
+secret = true
+secret_character = "*"
+
+[node name="LoginBtn" type="Button" parent="VBoxContainer" unique_id=276471626]
+layout_mode = 2
+text = "Login"
+
+[node name="RegisterBtn" type="Button" parent="VBoxContainer" unique_id=431620459]
+layout_mode = 2
+text = "Register"
+
+[node name="FeedbackLabel" type="Label" parent="VBoxContainer" unique_id=818904777]
+layout_mode = 2
+
+[connection signal="pressed" from="VBoxContainer/LoginBtn" to="." method="_on_login_btn_pressed"]
+[connection signal="pressed" from="VBoxContainer/RegisterBtn" to="." method="_on_register_btn_pressed"]

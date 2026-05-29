@@ -17,6 +17,7 @@ var data: Dictionary = {
 	"current_init": 0,
 	"is_hiden": false,
 	"owner_id": 1,
+	"light_radius": 0.0,
 }
 
 var current_aura_radius: float = 0.0
@@ -53,48 +54,51 @@ var drag_start_pos: Vector2 = Vector2.ZERO
 
 @onready var highlight_ring = $HightLightRing
 # --- MENU REFERENCES ---
-@onready var token_menu = $UI/TokenMenu
-@onready var main_menu = $UI/TokenMenu/MainMenu
-@onready var hp_main_btn = $UI/TokenMenu/MainMenu/HPMainBtn
-@onready var status_btn = $UI/TokenMenu/MainMenu/StatusBtn
-@onready var aura_btn = $UI/TokenMenu/MainMenu/AuraBtn
-@onready var light_btn = $UI/TokenMenu/MainMenu/LightBtn
-@onready var state_btn = $UI/TokenMenu/MainMenu/StateBtn
-@onready var edit_btn = $UI/TokenMenu/MainMenu/EditBtn
-@onready var hide_btn = $UI/TokenMenu/MainMenu/HideBtn
+@onready var token_menu = $UI/MenuLayer/TokenMenu
+@onready var main_menu = $UI/MenuLayer/TokenMenu/MainMenu
+@onready var hp_main_btn = $UI/MenuLayer/TokenMenu/MainMenu/HPMainBtn
+@onready var status_btn = $UI/MenuLayer/TokenMenu/MainMenu/StatusBtn
+@onready var aura_btn = $UI/MenuLayer/TokenMenu/MainMenu/AuraBtn
+@onready var light_btn = $UI/MenuLayer/TokenMenu/MainMenu/LightBtn
+@onready var state_btn = $UI/MenuLayer/TokenMenu/MainMenu/StateBtn
+@onready var edit_btn = $UI/MenuLayer/TokenMenu/MainMenu/EditBtn
+@onready var hide_btn = $UI/MenuLayer/TokenMenu/MainMenu/HideBtn
 
-@onready var hp_action_menu = $UI/TokenMenu/HPActionMenu
-@onready var amount_spinbox = $UI/TokenMenu/HPActionMenu/AmountSpinBox
-@onready var damage_btn = $UI/TokenMenu/HPActionMenu/DamageBtn
-@onready var heal_btn = $UI/TokenMenu/HPActionMenu/HealBtn
-@onready var level_up_btn = $UI/TokenMenu/HPActionMenu/LevelUpBtn
+@onready var hp_action_menu = $UI/MenuLayer/TokenMenu/HPActionMenu
+@onready var amount_spinbox = $UI/MenuLayer/TokenMenu/HPActionMenu/AmountSpinBox
+@onready var damage_btn = $UI/MenuLayer/TokenMenu/HPActionMenu/DamageBtn
+@onready var heal_btn = $UI/MenuLayer/TokenMenu/HPActionMenu/HealBtn
+@onready var level_up_btn = $UI/MenuLayer/TokenMenu/HPActionMenu/LevelUpBtn
 
-@onready var status_menu = $UI/TokenMenu/StatusMenu
-@onready var status_color_picker = $UI/TokenMenu/StatusMenu/StatusColorPicker
-@onready var clear_status_btn = $UI/TokenMenu/StatusMenu/ClearStatusBtn
+@onready var status_menu = $UI/MenuLayer/TokenMenu/StatusMenu
+@onready var status_color_picker = $UI/MenuLayer/TokenMenu/StatusMenu/StatusColorPicker
+@onready var clear_status_btn = $UI/MenuLayer/TokenMenu/StatusMenu/ClearStatusBtn
 
-@onready var aura_menu = $UI/TokenMenu/AuraMenu
-@onready var aura_radius_spin = $UI/TokenMenu/AuraMenu/AuraRadiusSpinBox
-@onready var aura_color_picker = $UI/TokenMenu/AuraMenu/AuraColorPicker
-@onready var clear_aura_btn = $UI/TokenMenu/AuraMenu/ClearAuraBtn
+@onready var aura_menu = $UI/MenuLayer/TokenMenu/AuraMenu
+@onready var aura_radius_spin = $UI/MenuLayer/TokenMenu/AuraMenu/AuraRadiusSpinBox
+@onready var aura_color_picker = $UI/MenuLayer/TokenMenu/AuraMenu/AuraColorPicker
+@onready var clear_aura_btn = $UI/MenuLayer/TokenMenu/AuraMenu/ClearAuraBtn
 
-@onready var light_menu = $UI/TokenMenu/LightMenu
-@onready var light_radius_spin = $UI/TokenMenu/LightMenu/LightRadiusSpinBox
-@onready var clear_light_btn = $UI/TokenMenu/LightMenu/ClearLightBtn
+@onready var light_menu = $UI/MenuLayer/TokenMenu/LightMenu
+@onready var light_radius_spin = $UI/MenuLayer/TokenMenu/LightMenu/LightRadiusSpinBox
+@onready var clear_light_btn = $UI/MenuLayer/TokenMenu/LightMenu/ClearLightBtn
 
-@onready var edit_menu = $UI/TokenMenu/EditMenu
-@onready var name_input = $UI/TokenMenu/EditMenu/NameInput
-@onready var base_color_picker = $UI/TokenMenu/EditMenu/BaseColorPicker
-@onready var ac_spinbox = $UI/TokenMenu/EditMenu/ACSpinBox
-@onready var speed_spinbox = $UI/TokenMenu/EditMenu/SpeedSpinBox
-@onready var init_bonus_spinbox = $UI/TokenMenu/EditMenu/InitBonusSpinBox
-@onready var owner_input = $UI/TokenMenu/EditMenu/OwnerInput
-@onready var assign_owner_btn = $UI/TokenMenu/EditMenu/AssignOwnerBtn
-@onready var close_edit_btn = $UI/TokenMenu/EditMenu/CloseEditBtn
+@onready var edit_menu = $UI/MenuLayer/TokenMenu/EditMenu
+@onready var name_input = $UI/MenuLayer/TokenMenu/EditMenu/NameInput
+@onready var base_color_picker = $UI/MenuLayer/TokenMenu/EditMenu/BaseColorPicker
+@onready var ac_spinbox = $UI/MenuLayer/TokenMenu/EditMenu/ACSpinBox
+@onready var speed_spinbox = $UI/MenuLayer/TokenMenu/EditMenu/SpeedSpinBox
+@onready var init_bonus_spinbox = $UI/MenuLayer/TokenMenu/EditMenu/InitBonusSpinBox
+@onready var owner_input = $UI/MenuLayer/TokenMenu/EditMenu/OwnerInput
+@onready var assign_owner_btn = $UI/MenuLayer/TokenMenu/EditMenu/AssignOwnerBtn
+@onready var close_edit_btn = $UI/MenuLayer/TokenMenu/EditMenu/CloseEditBtn
 
-@onready var resize_handle = $UI/ResizeHandle
+@onready var resize_handle = $UI/MenuLayer/ResizeHandle
 
 func _ready():
+	# Forces this token to create its own unique copy of the data dictionary!
+	data = data.duplicate(true)
+	
 	name_label.text = data["name"]
 	hp_bar.max_value = data["max_hp"]
 	hp_bar.value = data["hp"]
@@ -120,10 +124,7 @@ func _ready():
 	
 	update_visuals()
 	
-	if art_path != "":
-		var new_texture = load(art_path)
-		if new_texture:
-			sprite.texture = new_texture
+	load_token_image()
 			
 	# Apply the custom height offset we passed in from the dashboard
 	if height_offset != 0.0:
@@ -139,7 +140,7 @@ func _ready():
 	_setup_menu_signals()
 
 func _process(_delta):
-	var my_name = GameState.player_name
+	var my_uuid = GameState.user_id
 	var is_gm = GameState.is_gm_mode
 	
 	# 1. THE HIDE BUTTON LOGIC
@@ -149,12 +150,12 @@ func _process(_delta):
 		visible = true
 		
 	# 2. THE STATS & VISION LOGIC
-	var token_owner = data.get("owner_id", 1) 
+	var token_owner_id = str(data.get("owner_id", "1"))
 	
 	# THE MAGIC HYBRID CHECK:
 	# If you are the GM, you have absolute power. 
 	# If you are a player, your name must match the owner string!
-	if is_gm or my_name == str(token_owner):
+	if is_gm or my_uuid == str(token_owner_id):
 		name_label.visible = true 
 		hp_bar.visible = true
 		vision_light.visible = true
@@ -162,6 +163,15 @@ func _process(_delta):
 		name_label.visible = false
 		hp_bar.visible = false
 		vision_light.visible = false
+		
+	# 3. GLUE THE MENU TO THE TOKEN
+	# We only do the math if the menus are actually open to save performance
+	if token_menu.visible:
+		token_menu.global_position = sprite.global_position
+		
+	if resize_handle.visible and sprite.texture:
+		var extents = (sprite.texture.get_size() * sprite.scale) / 2.0
+		resize_handle.global_position = sprite.global_position + extents - (resize_handle.size / 2.0)
 
 # --- MOVEMENT (HYBRID DRAG + WASD) ---
 func _physics_process(_delta):
@@ -197,7 +207,7 @@ func snap_to_grid(target_pos: Vector2 = global_position):
 	global_position = Vector2(snapped_x + center_offset, snapped_y + center_offset) + grid_offset
 
 # --- DATA MANAGEMENT ---
-func update_data(key: String, new_value):
+func update_data(key: String, new_value, is_from_network: bool = false):
 	# Update or add the value to the dictionary
 	data[key] = new_value
 	
@@ -211,6 +221,21 @@ func update_data(key: String, new_value):
 		update_visuals()
 	elif key == "is_status_active" or key == "status_color":
 		update_visuals()
+		
+	elif key == "light_radius":
+		if new_value <= 0:
+			vision_light.energy = 0.0
+		else:
+			vision_light.energy = 1.0 
+			var desired_radius_pixels = (new_value / 5.0) * base_cell_size
+			var base_texture_radius = vision_light.texture.get_size().x / 2.0
+			vision_light.texture_scale = desired_radius_pixels / base_texture_radius
+			
+	# Only broadcast if a human clicked the menu. If the network sent this, stay quiet!
+	if not is_from_network:
+		var main_board = get_node_or_null("../../")
+		if main_board and main_board.has_method("broadcast_token_data_update"):
+			main_board.broadcast_token_data_update(name, key, new_value)
 
 
 # --- INPUT LOGIC ---
@@ -317,15 +342,17 @@ func place_on_circle(control_node: Control, angle_degrees: float, radius: float)
 	control_node.position = Vector2(cos(angle_rad) * radius, sin(angle_rad) * radius) - (control_node.size / 2.0)
 
 func update_radial_menu():
-	token_menu.position = sprite.position 
+	token_menu.global_position = sprite.global_position
 	
 	var inner_r = ((grid_size_in_squares * base_cell_size) / 2.0) + 10.0 
 	var main_r = inner_r + 65.0 
 	var sub_r = main_r + 75.0   
+	var outer_r = sub_r + 75.0
 	
 	token_menu.inner_radius = inner_r
 	token_menu.main_radius = main_r
 	token_menu.sub_radius = sub_r
+	token_menu.outer_radius = outer_r
 
 	# 1. Update the Global Array so the rest of the script knows what buttons exist!
 	current_main_btns = [hp_main_btn, status_btn, aura_btn, light_btn, edit_btn, state_btn]
@@ -345,7 +372,7 @@ func update_radial_menu():
 
 	token_menu.queue_redraw() 
 
-func _open_submenu(menu_to_show: Control, main_btn: Control, sub_items: Array):
+func _open_submenu(menu_to_show: Control, main_btn: Control, sub_items: Array, outer_items: Array = []):
 	main_menu.visible = false
 	hp_action_menu.visible = false
 	status_menu.visible = false
@@ -354,21 +381,31 @@ func _open_submenu(menu_to_show: Control, main_btn: Control, sub_items: Array):
 	edit_menu.visible = false # Make sure to hide the new edit menu!
 	menu_to_show.visible = true
 	
-	# NEW: Bulletproof Math. Find exactly where this button is in the circle!
+	# Bulletproof Math. Find exactly where this button is in the circle!
 	var main_index = current_main_btns.find(main_btn)
 	var main_step = 360.0 / current_main_btns.size()
 	var parent_angle = -90.0 + (main_index * main_step)
 	
 	token_menu.active_submenu_angle = deg_to_rad(parent_angle)
 	token_menu.sub_button_count = sub_items.size()
+	token_menu.outer_button_count = outer_items.size()
 	
 	var sub_step = main_step
+	
+	# --- RING 2 (SUB ITEMS) ---
 	var start_angle = parent_angle - ((sub_items.size() * sub_step) / 2.0) + (sub_step / 2.0)
-	var center_of_outer_slice = token_menu.main_radius + ((token_menu.sub_radius - token_menu.main_radius) / 2.0)
+	var center_of_sub_slice = token_menu.main_radius + ((token_menu.sub_radius - token_menu.main_radius) / 2.0)
 	
 	for i in range(sub_items.size()):
-		place_on_circle(sub_items[i], start_angle + (i * sub_step), center_of_outer_slice)
+		place_on_circle(sub_items[i], start_angle + (i * sub_step), center_of_sub_slice)
 		
+	# --- RING 3 (OUTER ITEMS) ---
+	if outer_items.size() > 0:
+		var outer_start_angle = parent_angle - ((outer_items.size() * sub_step) / 2.0) + (sub_step / 2.0)
+		var center_of_outer_slice = token_menu.sub_radius + ((token_menu.outer_radius - token_menu.sub_radius) / 2.0)
+		
+		for i in range(outer_items.size()):
+			place_on_circle(outer_items[i], outer_start_angle + (i * sub_step), center_of_outer_slice)
 		
 	resize_handle.visible = (menu_to_show == edit_menu)
 	token_menu.queue_redraw()
@@ -438,17 +475,8 @@ func _on_clear_aura_pressed():
 	token_menu.hide()
 
 func _on_light_radius_changed(value: float):
-	if value <= 0:
-		vision_light.energy = 0.0
-		return
-		
-	vision_light.energy = 1.0 
-	var desired_radius_pixels = (value / 5.0) * base_cell_size
-	var base_texture_radius = vision_light.texture.get_size().x / 2.0
-	vision_light.texture_scale = desired_radius_pixels / base_texture_radius
-
-func _on_light_color_changed(color: Color):
-	vision_light.color = color
+	# Tell the brain to remember the new size!
+	update_data("light_radius", value)
 
 func _on_clear_light_pressed():
 	vision_light.energy = 0.0
@@ -470,25 +498,36 @@ func _on_edit_btn_pressed():
 	owner_input.text = str(data.get("owner_id", 1))
 	base_color_picker.color = name_color
 	
+	# Ring 2 (Inner): Identity & Control
+	var ring_2_items = [name_input, owner_input, assign_owner_btn, close_edit_btn]
+	# Ring 3 (Outer): Combat Stats & Color
+	var ring_3_items = [ac_spinbox, speed_spinbox, init_bonus_spinbox, base_color_picker]
+	
 	# Open menu with the new buttons added to the array
-	_open_submenu(edit_menu, edit_btn, [
-		name_input, ac_spinbox, speed_spinbox, init_bonus_spinbox, base_color_picker,
-		owner_input, assign_owner_btn,
-		close_edit_btn
-	])
+	_open_submenu(edit_menu, edit_btn, ring_2_items, ring_3_items)
 
 func _on_assign_owner_pressed():
-	var new_owner_name = owner_input.text
-	if new_owner_name == "":
-		new_owner_name = "GM"
-		
-	update_data("owner_id", new_owner_name)
+	var typed_name = owner_input.text.strip_edges()
 	
-	var main_board = get_node_or_null("../../")
-	if main_board and main_board.has_method("broadcast_token_owner"):
-		main_board.broadcast_token_owner(name, new_owner_name)
+	if typed_name == "" or typed_name.to_upper() == "GM":
+		update_data("owner_id", "1") # "1" is our safe default for the GM
+		print("Assigned ownership back to GM")
+	else:
+		# Ask the game to find this player's UUID
+		var target_uuid = _get_uuid_from_name(typed_name)
 		
-	print("Assigned ownership to Player: " + new_owner_name)
+		if target_uuid != "":
+			update_data("owner_id", target_uuid)
+			print("Token assigned to " + typed_name + " (UUID: " + target_uuid.substr(0, 8) + "...)")
+			
+			# Broadcast the UUID to the network, not the name!
+			var main_board = get_node_or_null("../../")
+			if main_board and main_board.has_method("broadcast_token_owner"):
+				main_board.broadcast_token_owner(name, target_uuid)
+		else:
+			print("ERROR: Could not find a connected player named: ", typed_name)
+			# Optional: Change the input text to red to warn the GM
+			
 	token_menu.hide()
 
 func _on_hide_btn_pressed():
@@ -571,8 +610,6 @@ func update_visuals():
 	else:
 		sprite.modulate.a = 1.0 # Solid
 
-
-
 func normalize_size():
 	if sprite.texture == null:
 		return
@@ -620,6 +657,41 @@ func update_ui_positions():
 	
 	update_radial_menu()
 
-
 func set_selected(is_selected: bool):
 	highlight_ring.visible = is_selected
+
+# --- NEW IMAGE LOADING FUNCTION ---
+func load_token_image():
+	if art_path == "": return
+	
+	# 1. Try the original path (This works perfectly for the GM)
+	var image = Image.load_from_file(art_path)
+	
+	# 2. If it fails, check the Player's secret 'tokens' download folder!
+	if not image:
+		var file_name = art_path.get_file() 
+		var local_path = "user://tokens/" + file_name
+		image = Image.load_from_file(local_path)
+		
+	# 3. Apply the texture if we found it
+	if image:
+		var new_texture = ImageTexture.create_from_image(image)
+		sprite.texture = new_texture
+		normalize_size() # Ensure it scales correctly once loaded
+	else:
+		print("Waiting for token image to finish downloading...")
+
+func _get_uuid_from_name(target_name: String) -> String:
+	# If you are testing locally and typing your own name
+	if target_name == GameState.player_name:
+		return GameState.user_id
+		
+	# IDEAL SETUP: Your NetworkManager keeps a dictionary of connected players
+	# Example: NetworkManager.connected_players = { 1: {"name": "Shenhi", "uuid": "58ee..."} }
+	if NetworkManager and "connected_players" in NetworkManager:
+		for peer_id in NetworkManager.players:
+			var player_data = NetworkManager.players[peer_id]
+			if player_data.get("name") == target_name:
+				return player_data.get("uuid", "")
+				
+	return "" # Return empty if the player isn't found

@@ -35,9 +35,8 @@ layout_mode = 2
 layout_mode = 2
 text = "Bush Dice"
 
-[node name="NameInput" type="LineEdit" parent="CenterContainer/VBoxContainer" unique_id=525107508]
+[node name="WelcomeLabel" type="Label" parent="CenterContainer/VBoxContainer" unique_id=659271694]
 layout_mode = 2
-placeholder_text = "Name"
 
 [node name="IPInput" type="LineEdit" parent="CenterContainer/VBoxContainer" unique_id=1712597953]
 layout_mode = 2
@@ -54,6 +53,18 @@ text = "📂 Load Saved Campaign"
 [node name="JoinButton" type="Button" parent="CenterContainer/VBoxContainer" unique_id=193178422]
 layout_mode = 2
 text = "Join Ip"
+
+[node name="ChangeNameInput" type="LineEdit" parent="CenterContainer/VBoxContainer" unique_id=137738310]
+layout_mode = 2
+placeholder_text = "New Name"
+alignment = 1
+
+[node name="ChangeNameBtn" type="Button" parent="CenterContainer/VBoxContainer" unique_id=94319468]
+layout_mode = 2
+text = "Change Name"
+
+[node name="SettingsFeedbackLabel" type="Label" parent="CenterContainer/VBoxContainer" unique_id=168233937]
+layout_mode = 2
 
 [node name="LoadCampaignDialog" type="FileDialog" parent="." unique_id=192650964]
 title = "Open a File"

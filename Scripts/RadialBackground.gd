@@ -3,9 +3,12 @@ extends Control
 var inner_radius: float = 40.0
 var main_radius: float = 100.0
 var sub_radius: float = 160.0
+var outer_radius: float = 235.0
 
 var main_button_count: int = 5
 var sub_button_count: int = 0
+var outer_button_count: int = 0
+
 var active_submenu_angle: float = 0.0 # Stored in radians
 
 # Customization - Match the colors to your image!
@@ -33,6 +36,15 @@ func _draw():
 			var slice_end = slice_start + sub_step
 			# Add a 5-pixel gap between the rings!
 			_draw_wedge(center, main_radius + 5, sub_radius, slice_start, slice_end)
+			
+	if outer_button_count > 0:
+		var start = active_submenu_angle - ((outer_button_count * main_step) / 2.0)
+		for i in range(outer_button_count):
+			var slice_start = start + (i * main_step)
+			var slice_end = slice_start + main_step
+			_draw_wedge(center, sub_radius + 5, outer_radius, slice_start, slice_end)
+			
+
 
 func _draw_wedge(center: Vector2, r_in: float, r_out: float, a_start: float, a_end: float):
 	var pts = PackedVector2Array()

@@ -54,11 +54,13 @@ var measure_end_pos: Vector2 = Vector2.ZERO
 # DASHBOARD & INITIATIVE
 @onready var gm_dashboard = $UILayer/GMDashboard
 @onready var token_list = $UILayer/TabContainer/InitiativeTracker/MarginContainer/VBoxContainer/TokenList
+# NOTE: Check your exact node names for these buttons! If they are named slightly differently (like "RollInitiative" instead of "RollInitiativeBtn"), update the path here.
+@onready var roll_init_btn = $UILayer/TabContainer/InitiativeTracker/MarginContainer/VBoxContainer/RollInitiativeBtn
+@onready var reset_init_btn = $UILayer/TabContainer/InitiativeTracker/MarginContainer/VBoxContainer/ResetBtn
 
 const TOKEN_SCENE = preload("res://Scenes/token.tscn")
 
 func _ready():
-	darkness.visible = true
 	GameState.gm_mode_changed.connect(_on_gm_mode_changed)
 	token_layer.draw.connect(_on_token_layer_draw)
 	
@@ -67,6 +69,9 @@ func _ready():
 	gm_dashboard.create_new_scene_requested.connect(_on_gm_dashboard_create_new_scene_requested)
 	gm_dashboard.save_requested.connect(_on_gm_dashboard_save_requested)
 	gm_dashboard.load_requested.connect(_on_gm_dashboard_load_requested)
+	gm_dashboard.fog_bypass_toggled.connect(_on_fog_bypass_toggled)
+	gm_dashboard.spawn_party_requested.connect(_on_gm_dashboard_spawn_party_requested)
+	
 	
 	if not multiplayer.is_server():
 		rpc_id(1, "request_board_sync")
@@ -81,7 +86,7 @@ func _ready():
 	
 	# AUTO-SAVE TIMER
 	var autosave_timer = Timer.new()
-	autosave_timer.wait_time = 300.0 
+	autosave_timer.wait_time = 60.0
 	autosave_timer.autostart = true
 	autosave_timer.timeout.connect(func():
 		if multiplayer.is_server() and CampaignManager.current_save_path != "":
@@ -96,6 +101,12 @@ func _ready():
 	var my_id = multiplayer.get_unique_id()
 	var my_role = "GM" if my_id == 1 else "PLAYER"
 	
+	# Force the GameState to recognize if we are the admin!
+	if GameState.has_method("set_gm_mode"):
+		GameState.set_gm_mode(my_id == 1)
+	else:
+		GameState.is_gm_mode = (my_id == 1)
+	
 	# Grab the name we saved from the Main Menu!
 	var my_name = GameState.player_name
 	
@@ -108,6 +119,10 @@ func _ready():
 	
 	if not multiplayer.is_server():
 		rpc_id(1, "register_player_with_gm", my_name)
+		
+	# This forces the darkness, the GM dashboard, and the GM layer 
+	# to perfectly match who you are the exact second the map finishes loading.
+	_on_gm_mode_changed(GameState.is_gm_mode)
 
 func _get_token_under_mouse(mouse_pos: Vector2):
 	var tokens = token_layer.get_children()
@@ -305,15 +320,34 @@ func _spawn_permanent_wall(start: Vector2, end: Vector2):
 	wall_layer.add_child(new_wall)
 
 func _on_roll_init_btn_pressed():
+	if not multiplayer.is_server(): return # Extra security: Only the Host can roll
+	
 	var all_tokens = $TokenLayer.get_children()
 	var active_tokens = []
+	
 	for token in all_tokens:
 		if "data" in token: 
 			var roll = randi_range(1, 20)
+			# Update local data
 			token.update_data("current_init", roll + token.data["init_bonus"])
 			active_tokens.append(token)
+			
 	active_tokens.sort_custom(_sort_highest_init)
+	
+	# 1. Update the GM's local UI
 	_populate_initiative_ui(active_tokens)
+	
+	# 2. Build a "Scoreboard" to send to the players
+	var sync_data = []
+	for t in active_tokens:
+		sync_data.append({
+			"name": t.data["name"],
+			"init": t.data["current_init"],
+			"faction": t.data["faction"]
+		})
+		
+	# 3. Beam the scoreboard to everyone else!
+	rpc("receive_initiative_sync", sync_data)
 
 func _sort_highest_init(a, b):
 	return a.data["current_init"] > b.data["current_init"]
@@ -337,10 +371,26 @@ func _populate_initiative_ui(sorted_tokens: Array):
 		token_list.add_child(row)
 
 func _on_gm_mode_changed(is_gm: bool):
-	darkness.visible = !is_gm
+	# 1. Show the GM their secret tools
 	gm_layer.visible = is_gm
 	if gm_dashboard:
 		gm_dashboard.visible = is_gm
+		
+	# 2. Hide Initiative controls from players
+	if roll_init_btn: roll_init_btn.visible = is_gm
+	if reset_init_btn: reset_init_btn.visible = is_gm
+		
+	# 3. THE FIX: Everyone starts in the dark! 
+	# The GM can manually turn the lights on using their Fog toggle switch.
+	darkness.visible = true
+
+func _on_fog_bypass_toggled(is_bypassed: bool) -> void:
+	# Assuming your fog drawing layer is called "FogLayer" or similar. 
+	# (Change the name below if your fog node is named differently!)
+	if is_bypassed:
+		$Darkness.visible = false 
+	else:
+		$Darkness.visible = true
 
 func add_token_to_board(token_node):
 	token_layer.add_child(token_node)
@@ -348,7 +398,11 @@ func add_token_to_board(token_node):
 func _on_gm_dashboard_spawn_token_requested(image_path: String, y_offset: float, is_enemy_flag: bool) -> void:
 	if not multiplayer.is_server(): return 
 	var unique_id = "Token_" + str(Time.get_ticks_msec()) + "_" + str(randi() % 10000)
+	
+	NetworkManager.send_image_to_all(image_path, "token")
+	
 	_local_spawn_token(image_path, y_offset, is_enemy_flag, $GMCamera.global_position, unique_id)
+	
 	rpc("receive_spawn_token", image_path, y_offset, is_enemy_flag, $GMCamera.global_position, unique_id)
 
 func _local_spawn_token(img: String, offset: float, is_enemy: bool, pos: Vector2, token_id: String):
@@ -448,11 +502,20 @@ func _on_roll_btn_pressed() -> void:
 		rpc("receive_chat_message", my_name, public_msg, color)
 
 func _on_reset_init_btn_pressed() -> void:
+	if not multiplayer.is_server(): return # Only the host can do this
+	
 	for token in $TokenLayer.get_children():
 		if "data" in token: token.update_data("current_init", 0)
+		
+	# Clear GM UI
 	for child in token_list.get_children(): child.queue_free()
+	
+	# Tell players to clear their UI
+	rpc("receive_initiative_sync", [])
 
 func _on_gm_dashboard_save_requested(path: String):
+	_save_pcs_to_vault() # <--- Backup players before saving!
+	
 	var current_scene_id = CampaignManager.campaign_data["active_scene_id"]
 	var scene_data = {
 		"map_image_path": current_map_path, "map_scale": gm_dashboard.map_scale_spin_box.value,
@@ -530,12 +593,18 @@ func _on_gm_dashboard_load_requested(path: String):
 		# Force every player to wipe their board and load this newly unpacked data!
 		rpc("receive_board_sync", active_scene, scene_data, global_quests)
 		
+	# Update the Party UI tab on the dashboard!
+	if gm_dashboard.has_method("refresh_party_ui"):
+		gm_dashboard.refresh_party_ui()
+		
 	print("Campaign fully loaded and broadcasted to players from: ", path)
 
 # --- MULTI-SCENE LOGIC ---
 func _on_gm_dashboard_scene_switched(new_scene_id: String):
 	var old_scene_id = CampaignManager.campaign_data["active_scene_id"]
 	if old_scene_id == new_scene_id: return 
+	
+	_save_pcs_to_vault()
 	
 	var scene_data = {
 		"map_image_path": current_map_path, "map_scale": gm_dashboard.map_scale_spin_box.value,
@@ -610,6 +679,91 @@ func _on_gm_dashboard_rename_scene_requested(new_name: String):
 		if scene_id == new_name: gm_dashboard.scene_dropdown.select(index)
 		index += 1
 
+func _on_gm_dashboard_spawn_party_requested():
+	# Drop the party exactly where the GM is currently looking!
+	spawn_entire_party($GMCamera.global_position)
+
+# ==========================================
+# PC VAULT (PERSISTENT CHARACTERS)
+# ==========================================
+func _save_pcs_to_vault():
+	# Make sure the vault exists in the save file
+	if not CampaignManager.campaign_data.has("pc_vault"):
+		CampaignManager.campaign_data["pc_vault"] = {}
+		
+	# Scan the board for any token
+	if not token_layer: return
+	for token in token_layer.get_children():
+		if "data" in token:
+			# If the owner is NOT the GM, it is a Player Character! Save their brain!
+			if str(token.data.get("owner_id", "GM")) != "GM":
+				CampaignManager.campaign_data["pc_vault"][token.data["name"]] = {
+					"art_path": token.art_path,
+					"height_offset": token.height_offset,
+					"data": token.data.duplicate() # Exact copy of HP, Vision, etc.
+				}
+
+func spawn_entire_party(drop_pos: Vector2):
+	if not multiplayer.is_server(): return
+	if not CampaignManager.campaign_data.has("pc_vault"): return
+	
+	var offset_x = 0
+	for pc_name in CampaignManager.campaign_data["pc_vault"].keys():
+		var v_data = CampaignManager.campaign_data["pc_vault"][pc_name]
+		var unique_id = "Token_" + str(Time.get_ticks_msec()) + "_" + str(randi() % 1000)
+		
+		# Remind players to download the art just in case they are new!
+		NetworkManager.send_image_to_all(v_data["art_path"], "token")
+		
+		# Spawn locally, then tell the network
+		_local_spawn_vault_token(v_data, drop_pos + Vector2(offset_x, 0), unique_id)
+		rpc("receive_spawn_vault_token", v_data, drop_pos + Vector2(offset_x, 0), unique_id)
+		offset_x += 80 # Space them out so they don't stack on top of each other
+
+func _local_spawn_vault_token(v_data: Dictionary, pos: Vector2, token_id: String):
+	var new_token = TOKEN_SCENE.instantiate()
+	new_token.name = token_id
+	new_token.art_path = v_data["art_path"]
+	new_token.height_offset = v_data["height_offset"]
+	new_token.data = v_data["data"].duplicate() # INJECT THE SAVED BRAIN!
+	token_layer.add_child(new_token)
+	new_token.global_position = pos
+
+@rpc("authority", "call_remote", "reliable")
+func receive_spawn_vault_token(v_data: Dictionary, pos: Vector2, token_id: String):
+	_local_spawn_vault_token(v_data, pos, token_id)
+
+# 1. Spawning a Generic Monster
+func spawn_dropped_token(image_path: String, is_enemy: bool, drop_pos: Vector2):
+	if not multiplayer.is_server(): return 
+		
+	var unique_id = "Token_" + str(Time.get_ticks_msec()) + "_" + str(randi() % 1000)
+	var snapped_pos = get_snapped_center(drop_pos)
+	
+	NetworkManager.send_image_to_all(image_path, "token")
+	_local_spawn_token(image_path, 0.0, is_enemy, snapped_pos, unique_id)
+	rpc("receive_spawn_token", image_path, 0.0, is_enemy, snapped_pos, unique_id)
+
+# 2. Spawning a Specific Vault Player
+func spawn_single_vault_token(pc_name: String, drop_pos: Vector2):
+	if not multiplayer.is_server(): return
+	if not CampaignManager.campaign_data.has("pc_vault"): return
+	
+	# Make sure the player actually exists in the vault
+	if CampaignManager.campaign_data["pc_vault"].has(pc_name):
+		var v_data = CampaignManager.campaign_data["pc_vault"][pc_name]
+		var unique_id = "Token_" + str(Time.get_ticks_msec()) + "_" + str(randi() % 1000)
+		
+		var snapped_pos = get_snapped_center(drop_pos)
+		
+		# Beam the art to players, then spawn locally and remotely
+		NetworkManager.send_image_to_all(v_data["art_path"], "token")
+		
+		# Notice we use the _local_spawn_vault_token function here so it injects their saved brain!
+		_local_spawn_vault_token(v_data, snapped_pos, unique_id)
+		rpc("receive_spawn_vault_token", v_data, snapped_pos, unique_id)
+		
+
 # ==========================================
 # MULTIPLAYER SYNCING
 # ==========================================
@@ -643,6 +797,10 @@ func sync_roster_to_players(master_list: Dictionary):
 	if connected_players.has(my_id):
 		var my_role = connected_players[my_id]["role"]
 		var am_i_a_gm = (my_role == "GM")
+		
+		# If you are ID 1, you are the Host. The Host is ALWAYS a GM.
+		if my_id == 1:
+			am_i_a_gm = true
 		
 		# If our new network role doesn't match our local reality, fix it!
 		if GameState.is_gm_mode != am_i_a_gm:
@@ -835,16 +993,28 @@ func receive_quests_update(updated_quests: Array):
 # --- TOKEN DATA SYNCING ---
 func broadcast_token_data_update(token_name: String, key: String, new_value: Variant):
 	if multiplayer.is_server():
+		# The GM beams it directly to everyone
 		rpc("receive_token_data_update", token_name, key, new_value)
+	else:
+		# Players ask the GM's computer to distribute the data
+		rpc_id(1, "request_token_data_update", token_name, key, new_value)
+
+# The GM receives the player's request, verifies it, and beams it out
+@rpc("any_peer", "call_remote", "reliable")
+func request_token_data_update(token_name: String, key: String, new_value: Variant):
+	if multiplayer.is_server():
+		receive_token_data_update(token_name, key, new_value) # Apply to GM's board
+		rpc("receive_token_data_update", token_name, key, new_value) # Beam to other players
 
 @rpc("authority", "call_remote", "reliable")
 func receive_token_data_update(token_name: String, key: String, new_value: Variant):
 	# Find the token by its unique barcode and update its brain!
 	var target_token = token_layer.get_node_or_null(token_name)
 	if target_token and target_token.has_method("update_data"):
-		target_token.update_data(key, new_value)
+		# We pass "true" so the token knows this came from the internet, preventing infinite loops!
+		target_token.update_data(key, new_value, true)
 
-# ==========================================
+
 # TOKEN OWNERSHIP & HIDING
 # ==========================================
 
@@ -894,3 +1064,36 @@ func receive_chat_message(sender_name: String, text: String, color_hex: String):
 @rpc("any_peer", "call_remote", "reliable")
 func receive_whisper(formatted_msg: String):
 	chat_log.append_text(formatted_msg)
+
+# ==========================================
+# INITIATIVE RECEIVER
+# ==========================================
+@rpc("authority", "call_remote", "reliable")
+func receive_initiative_sync(sync_data: Array):
+	# 1. Wipe the old list clean
+	for child in token_list.get_children(): 
+		child.queue_free()
+		
+	# 2. If it's a reset (empty array), stop here
+	if sync_data.size() == 0:
+		return
+		
+	# 3. Rebuild the list perfectly matching the GM's screen
+	for item in sync_data:
+		var row = HBoxContainer.new()
+		
+		var name_label = Label.new()
+		name_label.text = item["name"]
+		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL 
+		
+		var score_label = Label.new()
+		score_label.text = str(item["init"])
+		
+		# Keep the red styling for enemies!
+		if item["faction"] == "enemy":
+			name_label.modulate = Color.RED
+			score_label.modulate = Color.RED
+			
+		row.add_child(name_label)
+		row.add_child(score_label)
+		token_list.add_child(row)

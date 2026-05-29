@@ -18,11 +18,11 @@ func _unhandled_input(event):
 		# Keep the zoom within our minimum and maximum limits
 		zoom = zoom.clamp(min_zoom, max_zoom)
 		
-	# 2. Handle Panning State (Spacebar)
+	# 2. Handle Panning State (Left CTRL)
 	# We now check specifically for a keyboard event and the Space key
-	if event is InputEventKey and event.keycode == KEY_CTRL:
-		# event.pressed is true when holding the key, and false when you let go
-		is_panning = event.pressed
+	if event is InputEventMouseMotion:
+		if Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
+			position -= event.relative / zoom
 
 	# 3. Handle Map Dragging (Mouse Movement)
 	if event is InputEventMouseMotion and is_panning:
