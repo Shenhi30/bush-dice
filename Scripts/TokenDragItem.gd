@@ -1,7 +1,6 @@
 extends VBoxContainer
 
 var token_image_path: String = ""
-@export var is_enemy: bool = true
 
 func _get_drag_data(_at_position: Vector2):
 	# Grab the texture from the child node!
@@ -19,8 +18,13 @@ func _get_drag_data(_at_position: Vector2):
 	preview.position = -preview.custom_minimum_size / 2.0 
 	set_drag_preview(c)
 	
+	var is_hostile = false
+	var enemy_box = get_tree().root.find_child("EnemyCheckBox", true, false)
+	if enemy_box:
+		is_hostile = enemy_box.button_pressed
+		
 	return {
 		"type": "token_drop",
 		"path": token_image_path,
-		"is_enemy": is_enemy
+		"is_enemy": is_hostile
 	}

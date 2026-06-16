@@ -1014,9 +1014,38 @@ func receive_token_data_update(token_name: String, key: String, new_value: Varia
 		# We pass "true" so the token knows this came from the internet, preventing infinite loops!
 		target_token.update_data(key, new_value, true)
 
-
+# ==========================================
 # TOKEN OWNERSHIP & HIDING
 # ==========================================
+
+# --- TOKEN DELETION ---
+func delete_token_networked(token_name: String):
+	if multiplayer.is_server():
+		# The GM deletes it locally, then tells everyone else to do the same
+		receive_token_delete(token_name)
+		rpc("receive_token_delete", token_name)
+	else:
+		# Players ask the GM to delete it
+		rpc_id(1, "request_token_delete", token_name)
+
+@rpc("any_peer", "call_remote", "reliable")
+func request_token_delete(token_name: String):
+	if not multiplayer.is_server(): return
+	
+	# The GM receives the request, deletes it, and broadcasts the wipe
+	receive_token_delete(token_name)
+	rpc("receive_token_delete", token_name)
+
+@rpc("authority", "call_remote", "reliable")
+func receive_token_delete(token_name: String):
+	var token = token_layer.get_node_or_null(token_name)
+	if token:
+		# If the token is currently selected (highlighted), remove it from the array to prevent crashes!
+		if token in selected_tokens:
+			selected_tokens.erase(token)
+			
+		token.queue_free()
+
 
 func broadcast_token_hidden_state(token_name: String, is_hidden: bool):
 	if multiplayer.is_server():

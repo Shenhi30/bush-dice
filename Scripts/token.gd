@@ -63,6 +63,7 @@ var drag_start_pos: Vector2 = Vector2.ZERO
 @onready var state_btn = $UI/MenuLayer/TokenMenu/MainMenu/StateBtn
 @onready var edit_btn = $UI/MenuLayer/TokenMenu/MainMenu/EditBtn
 @onready var hide_btn = $UI/MenuLayer/TokenMenu/MainMenu/HideBtn
+@onready var delete_btn = $UI/MenuLayer/TokenMenu/MainMenu/DeleteBtn
 
 @onready var hp_action_menu = $UI/MenuLayer/TokenMenu/HPActionMenu
 @onready var amount_spinbox = $UI/MenuLayer/TokenMenu/HPActionMenu/AmountSpinBox
@@ -311,6 +312,7 @@ func _setup_menu_signals():
 	light_btn.pressed.connect(func(): _open_submenu(light_menu, light_btn, [light_radius_spin,clear_light_btn]))
 	edit_btn.pressed.connect(_on_edit_btn_pressed)
 	hide_btn.pressed.connect(_on_hide_btn_pressed)
+	delete_btn.pressed.connect(_on_delete_btn_pressed)
 	
 	state_btn.pressed.connect(_on_state_toggle_pressed)
 	
@@ -355,7 +357,7 @@ func update_radial_menu():
 	token_menu.outer_radius = outer_r
 
 	# 1. Update the Global Array so the rest of the script knows what buttons exist!
-	current_main_btns = [hp_main_btn, status_btn, aura_btn, light_btn, edit_btn, state_btn]
+	current_main_btns = [hp_main_btn, status_btn, aura_btn, light_btn, edit_btn, state_btn, delete_btn]
 	hide_btn.visible = false 
 	
 	if GameState.is_gm_mode:
@@ -542,6 +544,13 @@ func _on_hide_btn_pressed():
 		
 	token_menu.hide()
 	update_visuals()
+
+func _on_delete_btn_pressed():
+	token_menu.hide()
+	var main_board = get_node_or_null("../../")
+	if main_board and main_board.has_method("delete_token_networked"):
+		main_board.delete_token_networked(name)
+
 
 # --- RESIZE LOGIC ---
 func _on_resize_handle_input(event):

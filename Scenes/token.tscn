@@ -167,6 +167,15 @@ offset_bottom = 31.0
 text = "Hide"
 flat = true
 
+[node name="DeleteBtn" type="Button" parent="UI/MenuLayer/TokenMenu/MainMenu" unique_id=795387646]
+z_index = 1000
+material = SubResource("CanvasItemMaterial_7ve0p")
+layout_mode = 0
+offset_right = 44.0
+offset_bottom = 31.0
+text = "Delete"
+flat = true
+
 [node name="HPActionMenu" type="Control" parent="UI/MenuLayer/TokenMenu" unique_id=1788668584]
 visible = false
 z_index = 1000
