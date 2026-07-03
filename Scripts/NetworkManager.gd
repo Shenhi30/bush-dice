@@ -6,7 +6,7 @@ var peer: ENetMultiplayerPeer
 # We need a brain to remember who is sitting at our table
 var players: Dictionary = {}
 var local_player_name: String = ""
-var local_player_uuid: String = "" # NEW: Store our secret ID
+var local_player_uuid: String = "" #  Store our secret ID
 
 # Signals to tell the UI what just happened
 signal server_started
@@ -34,7 +34,7 @@ func host_game(player_name: String) -> void:
 	multiplayer.multiplayer_peer = peer
 	
 	# In Godot networking, the Host is ALWAYS assigned the Network ID of 1.
-	# NEW: We now save the UUID into the host's dictionary slot
+	#  We now save the UUID into the host's dictionary slot
 	players[1] = {
 		"name": local_player_name, 
 		"uuid": local_player_uuid, 

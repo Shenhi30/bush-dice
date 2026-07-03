@@ -31,6 +31,8 @@ signal spawn_party_requested
 @onready var spawn_party_btn = $ToolPallete/TabContainer/Party/SpawnPartyBtn
 @onready var party_container = $ToolPallete/TabContainer/Party
 
+@onready var system_dropdown = $ToolPallete/TabContainer/Tools/SystemDropdown
+
 @onready var party_list = $ToolPallete/TabContainer/Party/PartyList
 # -- RENAME --
 @onready var rename_btn = $HBoxContainer/RenameSceneBtn
@@ -119,6 +121,20 @@ func _ready():
 		if new_name != "":
 			rename_scene_requested.emit(new_name)
 	)
+	
+	# --- NEW: SYSTEM DROPDOWN SETUP ---
+	system_dropdown.clear()
+	for system_id in SheetTemplates.TEMPLATES.keys():
+		# Capitalize makes "dnd_5e" look like "Dnd_5e" in the UI
+		system_dropdown.add_item(system_id.capitalize())
+		
+	system_dropdown.item_selected.connect(_on_system_changed)
+	
+	# Set the dropdown to show the currently active system
+	var active_system = CampaignManager.campaign_data.get("system_id", "dnd_5e")
+	var tab_index = SheetTemplates.TEMPLATES.keys().find(active_system)
+	if tab_index != -1:
+		system_dropdown.select(tab_index)
 
 
 func _process(delta: float):
@@ -296,6 +312,12 @@ func refresh_party_ui():
 		# 3. Add the complete row to the drawer
 		party_list.add_child(row)
 
+func _on_system_changed(index: int):
+	var system_ids = SheetTemplates.TEMPLATES.keys()
+	var selected_id = system_ids[index]
+	
+	# This triggers the CampaignManager to update the template and emit the signal
+	CampaignManager.set_campaign_system(selected_id)
 
 
 # Connect the "pressed" signal from your Minus button to this

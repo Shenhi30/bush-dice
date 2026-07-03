@@ -1,0 +1,12 @@
+[gd_scene format=3 uid="uid://brh7ykr3cbpgh"]
+
+[node name="LongTextComponent" type="VBoxContainer" unique_id=38527676]
+size_flags_horizontal = 3
+
+[node name="StatName" type="Label" parent="." unique_id=68780876]
+layout_mode = 2
+
+[node name="TextEdit" type="TextEdit" parent="." unique_id=528575436]
+custom_minimum_size = Vector2(30, 120)
+layout_mode = 2
+wrap_mode = 1

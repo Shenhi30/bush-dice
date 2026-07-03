@@ -1,0 +1,30 @@
+[gd_scene format=3 uid="uid://cp1t525623ag"]
+
+[node name="SkillRow" type="HBoxContainer" unique_id=1197804032]
+
+[node name="ProficiencyCheck" type="CheckBox" parent="." unique_id=779023467]
+layout_mode = 2
+text = "Prof"
+
+[node name="ExpertiseCheck" type="CheckBox" parent="." unique_id=1951346339]
+layout_mode = 2
+text = "Expert"
+
+[node name="SkillName" type="Label" parent="." unique_id=864405562]
+layout_mode = 2
+text = "Skill"
+
+[node name="TotalValue" type="SpinBox" parent="." unique_id=718930076]
+layout_mode = 2
+min_value = -99999.0
+max_value = 99999.0
+editable = false
+
+[node name="RollButton" type="Button" parent="." unique_id=684237497]
+layout_mode = 2
+text = "Roll"
+
+[node name="DeleteBtn" type="Button" parent="." unique_id=2037491068]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9504678, 0, 0, 1)
+text = "X"

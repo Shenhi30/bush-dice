@@ -2,22 +2,24 @@ extends CharacterBody2D
 
 # --- STATS & STATE ---
 
-# The Token's "Brain"
+# The Token's "System-Agnostic Brain"
 var data: Dictionary = {
+	# --- IDENTITY ---
 	"name": "Unknown",
-	"hp": 20,
-	"max_hp": 20,
-	"ac": 10,
-	"speed": 30,
-	"faction": "neutral", # Can be "neutral", "enemy", or "ally"
+	"owner_id": "1", # Default to GM
+	"faction": "neutral", # "neutral", "enemy", or "ally"
+	
+	# --- VTT STATES ---
+	"is_hidden": false,
 	"is_dead": false,
 	"is_status_active": false,
-	"status_color": "c45500b2", # Saved as a hex string so it can be written to JSON later!
-	"init_bonus": 2,
-	"current_init": 0,
-	"is_hiden": false,
-	"owner_id": 1,
+	"status_color": "c45500b2", 
 	"light_radius": 0.0,
+	"current_init": 0, # Used universally by the Initiative Tracker
+	
+	# --- UNIVERSAL RESOURCES ---
+	"hp": 20,
+	"max_hp": 20
 }
 
 var current_aura_radius: float = 0.0
@@ -64,6 +66,8 @@ var drag_start_pos: Vector2 = Vector2.ZERO
 @onready var edit_btn = $UI/MenuLayer/TokenMenu/MainMenu/EditBtn
 @onready var hide_btn = $UI/MenuLayer/TokenMenu/MainMenu/HideBtn
 @onready var delete_btn = $UI/MenuLayer/TokenMenu/MainMenu/DeleteBtn
+@onready var inv_btn = $UI/MenuLayer/TokenMenu/MainMenu/InvBtn
+@onready var sheet_btn = $UI/MenuLayer/TokenMenu/MainMenu/SheetBtn
 
 @onready var hp_action_menu = $UI/MenuLayer/TokenMenu/HPActionMenu
 @onready var amount_spinbox = $UI/MenuLayer/TokenMenu/HPActionMenu/AmountSpinBox
@@ -87,9 +91,6 @@ var drag_start_pos: Vector2 = Vector2.ZERO
 @onready var edit_menu = $UI/MenuLayer/TokenMenu/EditMenu
 @onready var name_input = $UI/MenuLayer/TokenMenu/EditMenu/NameInput
 @onready var base_color_picker = $UI/MenuLayer/TokenMenu/EditMenu/BaseColorPicker
-@onready var ac_spinbox = $UI/MenuLayer/TokenMenu/EditMenu/ACSpinBox
-@onready var speed_spinbox = $UI/MenuLayer/TokenMenu/EditMenu/SpeedSpinBox
-@onready var init_bonus_spinbox = $UI/MenuLayer/TokenMenu/EditMenu/InitBonusSpinBox
 @onready var owner_input = $UI/MenuLayer/TokenMenu/EditMenu/OwnerInput
 @onready var assign_owner_btn = $UI/MenuLayer/TokenMenu/EditMenu/AssignOwnerBtn
 @onready var close_edit_btn = $UI/MenuLayer/TokenMenu/EditMenu/CloseEditBtn
@@ -105,10 +106,6 @@ func _ready():
 	hp_bar.value = data["hp"]
 	name_label.modulate = name_color
 	
-	
-	_style_radial_spinbox(ac_spinbox)
-	_style_radial_spinbox(speed_spinbox)
-	_style_radial_spinbox(init_bonus_spinbox)
 	
 	# 1. Make the LineEdit transparent with white centered text
 	var empty_style = StyleBoxEmpty.new()
@@ -214,15 +211,35 @@ func update_data(key: String, new_value, is_from_network: bool = false):
 	
 	# Automatically update visuals/UI based on what changed
 	if key == "name":
-		name_label.text = data["name"]
+		# IMPORTANT: Change "NameLabel" to whatever the actual name 
+		# of your Label node is inside your Token scene!
+		var name_label = get_node_or_null("UI/NameLabel") 
+		if name_label:
+			name_label.text = str(new_value)
 	elif key == "hp" or key == "max_hp":
-		hp_bar.max_value = data["max_hp"]
-		hp_bar.value = data["hp"]
+		var hp_bar = get_node_or_null("UI/HPBar")
+		var hp_text = get_node_or_null("UI/HPBar/HPText") 
+		
+		if hp_bar:
+			# 1. Update the green bar itself
+			if key == "hp": 
+				hp_bar.value = int(new_value)
+			elif key == "max_hp": 
+				hp_bar.max_value = int(new_value)
+				
+			# 2. Update the text label (e.g., "15 / 20")
+			if hp_text:
+				# Grab the current numbers from the data dictionary (or fallback to the bar's default)
+				var current_hp = data.get("hp", hp_bar.value)
+				var maximum_hp = data.get("max_hp", hp_bar.max_value)
+				hp_text.text = str(current_hp) + " / " + str(maximum_hp)
+
 	elif key == "faction" or key == "is_dead":
 		update_visuals()
+
 	elif key == "is_status_active" or key == "status_color":
 		update_visuals()
-		
+
 	elif key == "light_radius":
 		if new_value <= 0:
 			vision_light.energy = 0.0
@@ -313,6 +330,8 @@ func _setup_menu_signals():
 	edit_btn.pressed.connect(_on_edit_btn_pressed)
 	hide_btn.pressed.connect(_on_hide_btn_pressed)
 	delete_btn.pressed.connect(_on_delete_btn_pressed)
+	inv_btn.pressed.connect(_on_inv_btn_pressed)
+	sheet_btn.pressed.connect(_on_sheet_btn_pressed)
 	
 	state_btn.pressed.connect(_on_state_toggle_pressed)
 	
@@ -334,9 +353,6 @@ func _setup_menu_signals():
 	
 	name_input.text_changed.connect(_on_name_changed) # Updates in real-time as you type!
 	base_color_picker.color_changed.connect(_on_base_color_changed)
-	ac_spinbox.value_changed.connect(func(val): update_data("ac", val))
-	speed_spinbox.value_changed.connect(func(val): update_data("speed", val))
-	init_bonus_spinbox.value_changed.connect(func(val): update_data("init_bonus", val))
 	close_edit_btn.pressed.connect(func(): token_menu.hide())
 
 func place_on_circle(control_node: Control, angle_degrees: float, radius: float):
@@ -357,7 +373,7 @@ func update_radial_menu():
 	token_menu.outer_radius = outer_r
 
 	# 1. Update the Global Array so the rest of the script knows what buttons exist!
-	current_main_btns = [hp_main_btn, status_btn, aura_btn, light_btn, edit_btn, state_btn, delete_btn]
+	current_main_btns = [hp_main_btn, status_btn, aura_btn, light_btn, edit_btn, state_btn, delete_btn, inv_btn, sheet_btn]
 	hide_btn.visible = false 
 	
 	if GameState.is_gm_mode:
@@ -492,10 +508,7 @@ func _on_base_color_changed(color: Color):
 func _on_edit_btn_pressed():
 	# Read current stats
 	name_input.text = data["name"]
-	ac_spinbox.value = data["ac"]
-	speed_spinbox.value = data["speed"]
-	init_bonus_spinbox.value = data["init_bonus"]
-	
+		
 	# Tell the color picker to show the current name color!
 	owner_input.text = str(data.get("owner_id", 1))
 	base_color_picker.color = name_color
@@ -503,10 +516,12 @@ func _on_edit_btn_pressed():
 	# Ring 2 (Inner): Identity & Control
 	var ring_2_items = [name_input, owner_input, assign_owner_btn, close_edit_btn]
 	# Ring 3 (Outer): Combat Stats & Color
-	var ring_3_items = [ac_spinbox, speed_spinbox, init_bonus_spinbox, base_color_picker]
+	var ring_3_items = [base_color_picker]
 	
 	# Open menu with the new buttons added to the array
 	_open_submenu(edit_menu, edit_btn, ring_2_items, ring_3_items)
+
+
 
 func _on_assign_owner_pressed():
 	var typed_name = owner_input.text.strip_edges()
@@ -551,6 +566,23 @@ func _on_delete_btn_pressed():
 	if main_board and main_board.has_method("delete_token_networked"):
 		main_board.delete_token_networked(name)
 
+func _on_inv_btn_pressed():
+	token_menu.hide()
+	
+	# Ask the MainBoard to open the window for THIS token's owner!
+	var target_uuid = str(data.get("owner_id", "GM"))
+	var token_name = data.get("name", "Unknown")
+	
+	var main_board = get_node_or_null("../../")
+	if main_board and main_board.has_method("open_inventory_window"):
+		main_board.open_inventory_window(target_uuid, token_name)
+
+func _on_sheet_btn_pressed():
+	token_menu.hide() # Close the radial menu so it's not in the way
+	
+	var main_board = get_node_or_null("../../")
+	if main_board and main_board.has_method("open_character_sheet_for_token"):
+		main_board.open_character_sheet_for_token(name)
 
 # --- RESIZE LOGIC ---
 func _on_resize_handle_input(event):

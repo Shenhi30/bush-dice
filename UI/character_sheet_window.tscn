@@ -1,0 +1,54 @@
+[gd_scene format=3 uid="uid://c7o6bdrv70rlo"]
+
+[ext_resource type="StyleBox" uid="uid://bwqvnpqvn36dn" path="res://Assets/Brown_box_flat.tres" id="1_iw3qj"]
+[ext_resource type="Script" uid="uid://bgek320ckesoi" path="res://Scripts/character_sheet_window.gd" id="2_b28lc"]
+[ext_resource type="PackedScene" uid="uid://2a0h66dq03v1" path="res://UI/add_blueprint_popup.tscn" id="3_nbny1"]
+
+[node name="CharacterSheetWindow" type="PanelContainer" unique_id=1768750079]
+offset_left = 136.0
+offset_top = 47.0
+offset_right = 636.0
+offset_bottom = 547.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_styles/panel = ExtResource("1_iw3qj")
+script = ExtResource("2_b28lc")
+
+[node name="MarginContainer" type="MarginContainer" parent="." unique_id=989703984]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer" unique_id=1849188883]
+layout_mode = 2
+
+[node name="HBoxContainer" type="HBoxContainer" parent="MarginContainer/VBoxContainer" unique_id=1390551984]
+layout_mode = 2
+
+[node name="TitleLabel" type="Label" parent="MarginContainer/VBoxContainer/HBoxContainer" unique_id=233982236]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 1
+text = "Character Sheet"
+
+[node name="AddStatBtn" type="Button" parent="MarginContainer/VBoxContainer/HBoxContainer" unique_id=154014903]
+layout_mode = 2
+text = " Add custom stat"
+
+[node name="SaveBtn" type="Button" parent="MarginContainer/VBoxContainer/HBoxContainer" unique_id=2034589899]
+layout_mode = 2
+text = "Save sheet"
+
+[node name="CloseBtn" type="Button" parent="MarginContainer/VBoxContainer/HBoxContainer" unique_id=1949268523]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9676589, 0, 0, 1)
+text = "X"
+flat = true
+
+[node name="TabContainer" type="TabContainer" parent="MarginContainer/VBoxContainer" unique_id=1547567576]
+layout_mode = 2
+
+[node name="AddBlueprintPopup" parent="." unique_id=1826963280 instance=ExtResource("3_nbny1")]
+visible = false

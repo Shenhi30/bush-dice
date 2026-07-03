@@ -1,0 +1,27 @@
+[gd_scene format=3 uid="uid://ckej1mxxoifjg"]
+
+[node name="StatRow" type="HBoxContainer" unique_id=2037615290]
+offset_right = 109.0
+offset_bottom = 31.0
+
+[node name="StatName" type="Label" parent="." unique_id=242129109]
+layout_mode = 2
+text = "Stat"
+
+[node name="BaseValue" type="SpinBox" parent="." unique_id=735858455]
+layout_mode = 2
+min_value = -99999.0
+max_value = 99999.0
+
+[node name="ModifierLabel" type="Label" parent="." unique_id=944677249]
+layout_mode = 2
+text = "+0"
+
+[node name="RollButton" type="Button" parent="." unique_id=408852242]
+layout_mode = 2
+text = "Roll"
+
+[node name="DeleteBtn" type="Button" parent="." unique_id=267063932]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9537517, 0, 0, 1)
+text = "X"

@@ -1,0 +1,44 @@
+[gd_scene format=3 uid="uid://b1c7ctb1bd10m"]
+
+[node name="DeathSavesComponent" type="HBoxContainer" unique_id=1490139600]
+
+[node name="Label" type="Label" parent="." unique_id=345221234]
+layout_mode = 2
+text = "Death Saves
+"
+
+[node name="Successes" type="HBoxContainer" parent="." unique_id=735635144]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Successes" unique_id=1324095065]
+layout_mode = 2
+text = "Suc"
+
+[node name="CheckBox" type="CheckBox" parent="Successes" unique_id=1521581244]
+layout_mode = 2
+
+[node name="CheckBox2" type="CheckBox" parent="Successes" unique_id=743596898]
+layout_mode = 2
+
+[node name="CheckBox3" type="CheckBox" parent="Successes" unique_id=1753500569]
+layout_mode = 2
+
+[node name="Failures" type="HBoxContainer" parent="." unique_id=1520509455]
+layout_mode = 2
+
+[node name="Label2" type="Label" parent="Failures" unique_id=1985776968]
+layout_mode = 2
+text = "Fail"
+
+[node name="CheckBox" type="CheckBox" parent="Failures" unique_id=1780938946]
+layout_mode = 2
+
+[node name="CheckBox2" type="CheckBox" parent="Failures" unique_id=1424817237]
+layout_mode = 2
+
+[node name="CheckBox3" type="CheckBox" parent="Failures" unique_id=944280797]
+layout_mode = 2
+
+[node name="RollButton" type="Button" parent="." unique_id=1822191762]
+layout_mode = 2
+text = "Roll"

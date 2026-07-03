@@ -83,7 +83,7 @@ func _on_join_pressed():
 	# Notice we are NO LONGER changing scenes directly here!
 	# We have to wait for the server to accept us first.
 
-# --- NEW: USERNAME CHANGER LOGIC ---
+# ---  USERNAME CHANGER LOGIC ---
 func _on_change_name_pressed():
 	var new_name = change_name_input.text.strip_edges()
 	

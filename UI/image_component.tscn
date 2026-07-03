@@ -1,0 +1,17 @@
+[gd_scene format=3 uid="uid://bwdqt7w25gfsk"]
+
+[node name="ImageComponent" type="HBoxContainer" unique_id=1582245997]
+size_flags_horizontal = 3
+
+[node name="StatName" type="Label" parent="." unique_id=1097126216]
+layout_mode = 2
+text = "Portrait"
+
+[node name="CenterContainer" type="CenterContainer" parent="." unique_id=309268367]
+layout_mode = 2
+
+[node name="TextureRect" type="TextureRect" parent="CenterContainer" unique_id=556528252]
+custom_minimum_size = Vector2(150, 150)
+layout_mode = 2
+expand_mode = 1
+stretch_mode = 5

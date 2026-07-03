@@ -1,5 +1,25 @@
 {
-	"active_scene_id": "map_1",
+	"active_scene_id": "map_2",
+	"backpacks": {
+		"gospoza": [
+			{
+				"desc": "+1d6",
+				"id": "item_34150_172",
+				"name": "das"
+			},
+			{
+				"desc": "sda",
+				"id": "item_60738_214",
+				"name": "dsa"
+			},
+			{
+				"desc": "dsa",
+				"id": "item_71194_447",
+				"name": "dsa"
+			}
+		],
+		"test1": []
+	},
 	"campaign_name": "New Campaign",
 	"pc_vault": {
 		"Unknown": {

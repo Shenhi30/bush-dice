@@ -4,7 +4,8 @@ extends Node2D
 enum Mode { SELECT, DRAW_WALL, ERASE_WALL, MEASURE }
 var current_mode: Mode = Mode.SELECT
 
-
+@onready var inv_window = $UILayer/InventoryWindow
+@onready var char_sheet_window = $UILayer/CharacterSheetWindow
 # --- PLAYER ROSTER VARIABLES ---
 @onready var player_container = $UILayer/TabContainer/PlayerListPanel/PlayerContainer
 var connected_players: Dictionary = {} # Stores ID -> {name, role}
@@ -14,23 +15,25 @@ var quests: Array = []
 var current_map_path: String = ""
 
 @onready var quest_tracker = $UILayer/CodeQuestTracker
-@onready var wall_layer = $WallLayer 
+@onready var wall_layer = $WallLayer
 @onready var map_layer = $MapLayer/MapSprite
 @onready var gm_layer = $GMLayer
 @onready var token_layer = $TokenLayer
 @onready var darkness = $Darkness
 
 # --- CHAT LOG NODES ---
-@onready var chat_log = $UILayer/TabContainer/ChatPanel/VBoxContainer/ChatLog
+@onready var chat_log = $UILayer/TabContainer/ChatPanel/VBoxContainer/ScrollContainer/ChatLog
 @onready var chat_input = $UILayer/TabContainer/ChatPanel/VBoxContainer/HBoxContainer/ChatInput
 @onready var chat_send_btn = $UILayer/TabContainer/ChatPanel/VBoxContainer/HBoxContainer/SendBtn
 
 
+var currently_viewed_backpack_uuid = ""
+
 # --- SELECTION & DRAGGING VARIABLES ---
 var drag_start: Vector2 = Vector2.ZERO
 var drag_end: Vector2 = Vector2.ZERO
-var is_drawing_box: bool = false      
-var is_dragging_tokens: bool = false  
+var is_drawing_box: bool = false
+var is_dragging_tokens: bool = false
 var last_mouse_pos: Vector2 = Vector2.ZERO
 var selected_tokens: Array = []
 
@@ -54,16 +57,23 @@ var measure_end_pos: Vector2 = Vector2.ZERO
 # DASHBOARD & INITIATIVE
 @onready var gm_dashboard = $UILayer/GMDashboard
 @onready var token_list = $UILayer/TabContainer/InitiativeTracker/MarginContainer/VBoxContainer/TokenList
-# NOTE: Check your exact node names for these buttons! If they are named slightly differently (like "RollInitiative" instead of "RollInitiativeBtn"), update the path here.
-@onready var roll_init_btn = $UILayer/TabContainer/InitiativeTracker/MarginContainer/VBoxContainer/RollInitiativeBtn
-@onready var reset_init_btn = $UILayer/TabContainer/InitiativeTracker/MarginContainer/VBoxContainer/ResetBtn
+@onready var roll_init_btn = $UILayer/TabContainer/InitiativeTracker/MarginContainer/VBoxContainer/RollInitBtn
+@onready var reset_init_btn = $UILayer/TabContainer/InitiativeTracker/MarginContainer/VBoxContainer/ResetInitBtn
 
 const TOKEN_SCENE = preload("res://Scenes/token.tscn")
 
 func _ready():
+	# --- NEW CHAT FIXES ---
+	chat_log.text = "" # Wipes the placeholder text
+	chat_log.scroll_following = true # Forces the chat to always scroll down
+	
+	# --- NEW SKILL EDIT SYNC ---
+	CampaignManager.token_data_edit_requested.connect(broadcast_token_data_update)
+
 	GameState.gm_mode_changed.connect(_on_gm_mode_changed)
 	token_layer.draw.connect(_on_token_layer_draw)
 	
+	CampaignManager.fast_roll_requested.connect(_on_character_sheet_roll)
 	gm_dashboard.rename_scene_requested.connect(_on_gm_dashboard_rename_scene_requested)
 	gm_dashboard.scene_switched.connect(_on_gm_dashboard_scene_switched)
 	gm_dashboard.create_new_scene_requested.connect(_on_gm_dashboard_create_new_scene_requested)
@@ -86,7 +96,7 @@ func _ready():
 	
 	# AUTO-SAVE TIMER
 	var autosave_timer = Timer.new()
-	autosave_timer.wait_time = 60.0
+	autosave_timer.wait_time = 5.0
 	autosave_timer.autostart = true
 	autosave_timer.timeout.connect(func():
 		if multiplayer.is_server() and CampaignManager.current_save_path != "":
@@ -111,7 +121,7 @@ func _ready():
 	var my_name = GameState.player_name
 	
 	# Fallback: Just in case they left the box blank
-	if my_name == "": 
+	if my_name == "":
 		my_name = "GM" if my_id == 1 else "Player_" + str(my_id).left(4)
 		
 	connected_players[my_id] = {"name": my_name, "role": my_role}
@@ -123,6 +133,14 @@ func _ready():
 	# This forces the darkness, the GM dashboard, and the GM layer 
 	# to perfectly match who you are the exact second the map finishes loading.
 	_on_gm_mode_changed(GameState.is_gm_mode)
+	
+	# Hook up the new Inventory Scene
+	inv_window.close_requested.connect(func(): inv_window.visible = false)
+	inv_window.add_item_requested.connect(_on_inv_add_item)
+	inv_window.delete_item_requested.connect(_on_inv_delete_item)
+	
+	if not CampaignManager.campaign_data.has("backpacks"):
+		CampaignManager.campaign_data["backpacks"] = {}
 
 func _get_token_under_mouse(mouse_pos: Vector2):
 	var tokens = token_layer.get_children()
@@ -130,7 +148,7 @@ func _get_token_under_mouse(mouse_pos: Vector2):
 		var token = tokens[i]
 		if token.global_position.distance_to(mouse_pos) < 32.0:
 			return token
-	return null 
+	return null
 
 func _unhandled_input(event):
 	if current_mode == Mode.SELECT:
@@ -144,7 +162,7 @@ func _unhandled_input(event):
 				elif event.keycode == KEY_D or event.keycode == KEY_RIGHT: move_dir.x += 1
 				
 				if move_dir != Vector2.ZERO:
-					var grid_size = 64.0 
+					var grid_size = 64.0
 					for token in selected_tokens:
 						if GameState.is_gm_mode:
 							token.global_position += move_dir * grid_size # GM Teleports
@@ -228,7 +246,7 @@ func _unhandled_input(event):
 						is_drawing_wall = false
 			elif event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
 				is_drawing_wall = false
-			queue_redraw() 
+			queue_redraw()
 		elif event is InputEventMouseMotion and is_drawing_wall:
 			wall_end_pos = get_global_mouse_position()
 			queue_redraw()
@@ -238,10 +256,10 @@ func _unhandled_input(event):
 			var wall_to_delete = _get_wall_under_mouse(get_global_mouse_position())
 			if wall_to_delete:
 					# Grab the coordinates before we destroy it!
-					var w_start = wall_to_delete.points[0]
-					var w_end = wall_to_delete.points[1]
-					wall_to_delete.queue_free()
-					broadcast_wall_erase(w_start, w_end)
+				var w_start = wall_to_delete.points[0]
+				var w_end = wall_to_delete.points[1]
+				wall_to_delete.queue_free()
+				broadcast_wall_erase(w_start, w_end)
 
 	elif current_mode == Mode.MEASURE:
 		if event is InputEventMouseButton:
@@ -266,7 +284,7 @@ func _clear_selection():
 
 func _select_tokens_in_box():
 	var selection_rect = Rect2(drag_start, drag_end - drag_start).abs()
-	selected_tokens.clear() 
+	selected_tokens.clear()
 	for token in token_layer.get_children():
 		if selection_rect.has_point(token.global_position):
 			selected_tokens.append(token)
@@ -276,8 +294,8 @@ func _select_tokens_in_box():
 
 func _on_token_layer_draw():
 	if is_drawing_box:
-		var rect = Rect2(drag_start, drag_end - drag_start).abs() 
-		token_layer.draw_rect(rect, Color(0.2, 0.5, 1.0, 0.3), true) 
+		var rect = Rect2(drag_start, drag_end - drag_start).abs()
+		token_layer.draw_rect(rect, Color(0.2, 0.5, 1.0, 0.3), true)
 		token_layer.draw_rect(rect, Color(0.2, 0.5, 1.0, 0.8), false, 2.0)
 		
 	if is_drawing_wall:
@@ -286,16 +304,16 @@ func _on_token_layer_draw():
 	if is_measuring:
 		token_layer.draw_line(measure_start_pos, measure_end_pos, Color(0.987, 0.536, 0.942, 0.7), 6.0)
 		var pixel_distance = measure_start_pos.distance_to(measure_end_pos)
-		var grid_size = 64.0 
+		var grid_size = 64.0
 		var feet_distance = (pixel_distance / grid_size) * 5.0
 		var distance_text = str(round(feet_distance)) + " ft."
 		var mid_point = (measure_start_pos + measure_end_pos) / 2.0
-		var font = ThemeDB.fallback_font 
+		var font = ThemeDB.fallback_font
 		token_layer.draw_string(font, mid_point + Vector2(2, 22), distance_text, HORIZONTAL_ALIGNMENT_CENTER, -1, 24, Color.BLACK)
 		token_layer.draw_string(font, mid_point + Vector2(0, 20), distance_text, HORIZONTAL_ALIGNMENT_CENTER, -1, 24, Color.WHITE)
 
 func _spawn_permanent_wall(start: Vector2, end: Vector2):
-	if start.distance_to(end) < 5.0: return 
+	if start.distance_to(end) < 5.0: return
 	var new_wall = Line2D.new()
 	new_wall.add_point(start)
 	new_wall.add_point(end)
@@ -314,7 +332,7 @@ func _spawn_permanent_wall(start: Vector2, end: Vector2):
 	var occluder = LightOccluder2D.new()
 	var poly = OccluderPolygon2D.new()
 	poly.polygon = PackedVector2Array([start, end])
-	poly.closed = false 
+	poly.closed = false
 	occluder.occluder = poly
 	new_wall.add_child(occluder)
 	wall_layer.add_child(new_wall)
@@ -327,10 +345,14 @@ func _on_roll_init_btn_pressed():
 	
 	for token in all_tokens:
 		if "data" in token: 
-			var roll = randi_range(1, 20)
-			# Update local data
-			token.update_data("current_init", roll + token.data["init_bonus"])
-			active_tokens.append(token)
+			# Only roll fresh dice if they are an enemy, or if they haven't rolled yet (score is 0)
+			if token.data.get("faction", "neutral") == "enemy" or token.data.get("current_init", 0) == 0:
+				var roll = randi_range(1, 20)
+				token.update_data("current_init", roll + token.data.get("init_bonus", 0))
+				
+			# We still append EVERYONE to active_tokens so players don't get left off the scoreboard
+			if token.data.get("current_init", 0) > 0:
+				active_tokens.append(token)
 			
 	active_tokens.sort_custom(_sort_highest_init)
 	
@@ -343,26 +365,26 @@ func _on_roll_init_btn_pressed():
 		sync_data.append({
 			"name": t.data["name"],
 			"init": t.data["current_init"],
-			"faction": t.data["faction"]
+			"faction": t.data.get("faction", "neutral")
 		})
 		
 	# 3. Beam the scoreboard to everyone else!
 	rpc("receive_initiative_sync", sync_data)
 
 func _sort_highest_init(a, b):
-	return a.data["current_init"] > b.data["current_init"]
+	return a.data.get("current_init", 0) > b.data.get("current_init", 0)
 
 func _populate_initiative_ui(sorted_tokens: Array):
 	for child in token_list.get_children(): child.queue_free()
 	for token in sorted_tokens:
 		var row = HBoxContainer.new()
 		var name_label = Label.new()
-		name_label.text = token.data["name"]
-		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL 
+		name_label.text = token.data.get("name", "Unknown")
+		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		var score_label = Label.new()
-		score_label.text = str(token.data["current_init"])
+		score_label.text = str(token.data.get("current_init", 0))
 		
-		if token.data["faction"] == "enemy":
+		if token.data.get("faction", "neutral") == "enemy":
 			name_label.modulate = Color.RED
 			score_label.modulate = Color.RED
 			
@@ -388,7 +410,7 @@ func _on_fog_bypass_toggled(is_bypassed: bool) -> void:
 	# Assuming your fog drawing layer is called "FogLayer" or similar. 
 	# (Change the name below if your fog node is named differently!)
 	if is_bypassed:
-		$Darkness.visible = false 
+		$Darkness.visible = false
 	else:
 		$Darkness.visible = true
 
@@ -396,7 +418,7 @@ func add_token_to_board(token_node):
 	token_layer.add_child(token_node)
 
 func _on_gm_dashboard_spawn_token_requested(image_path: String, y_offset: float, is_enemy_flag: bool) -> void:
-	if not multiplayer.is_server(): return 
+	if not multiplayer.is_server(): return
 	var unique_id = "Token_" + str(Time.get_ticks_msec()) + "_" + str(randi() % 10000)
 	
 	NetworkManager.send_image_to_all(image_path, "token")
@@ -447,7 +469,7 @@ func _on_gm_dashboard_tool_mode_changed(mode_index: int) -> void:
 
 func _get_wall_under_mouse(mouse_pos: Vector2) -> Node2D:
 	var best_wall = null
-	var min_dist = 15.0 
+	var min_dist = 15.0
 	for wall in wall_layer.get_children():
 		if wall is Line2D and wall.points.size() >= 2:
 			var closest_point = Geometry2D.get_closest_point_to_segment(mouse_pos, wall.points[0], wall.points[1])
@@ -458,7 +480,7 @@ func _get_wall_under_mouse(mouse_pos: Vector2) -> Node2D:
 	return best_wall
 
 func get_snapped_center(pos: Vector2) -> Vector2:
-	var grid_size = 64.0 
+	var grid_size = 64.0
 	var snapped_x = floor(pos.x / grid_size) * grid_size
 	var snapped_y = floor(pos.y / grid_size) * grid_size
 	var center_offset = grid_size / 2.0
@@ -478,9 +500,9 @@ func _on_roll_btn_pressed() -> void:
 		total_sum += roll
 		
 	var final_total = total_sum + modifier
-	var breakdown_text = str(individual_rolls) 
+	var breakdown_text = str(individual_rolls)
 	if modifier > 0: breakdown_text += " + " + str(modifier)
-	elif modifier < 0: breakdown_text += " " + str(modifier) 
+	elif modifier < 0: breakdown_text += " " + str(modifier)
 	breakdown_text += " = " + str(final_total)
 	
 	var my_name = GameState.player_name
@@ -538,7 +560,7 @@ func _on_gm_dashboard_save_requested(path: String):
 	var file = FileAccess.open(path, FileAccess.WRITE)
 	if file:
 		file.store_string(JSON.stringify(CampaignManager.campaign_data, "\t"))
-		CampaignManager.current_save_path = path 
+		CampaignManager.current_save_path = path
 
 func _on_gm_dashboard_load_requested(path: String):
 	var file = FileAccess.open(path, FileAccess.READ)
@@ -548,6 +570,11 @@ func _on_gm_dashboard_load_requested(path: String):
 	
 	CampaignManager.campaign_data = loaded_data
 	CampaignManager.current_save_path = path
+	
+	if not CampaignManager.campaign_data.has("backpacks"):
+		CampaignManager.campaign_data["backpacks"] = {}
+	if not CampaignManager.campaign_data.has("pc_vault"):
+		CampaignManager.campaign_data["pc_vault"] = {}
 	
 	gm_dashboard.scene_dropdown.clear()
 	var active_scene = CampaignManager.campaign_data["active_scene_id"]
@@ -602,7 +629,7 @@ func _on_gm_dashboard_load_requested(path: String):
 # --- MULTI-SCENE LOGIC ---
 func _on_gm_dashboard_scene_switched(new_scene_id: String):
 	var old_scene_id = CampaignManager.campaign_data["active_scene_id"]
-	if old_scene_id == new_scene_id: return 
+	if old_scene_id == new_scene_id: return
 	
 	_save_pcs_to_vault()
 	
@@ -614,7 +641,7 @@ func _on_gm_dashboard_scene_switched(new_scene_id: String):
 		if "data" in token:
 			scene_data["tokens"].append({
 				"name": token.name,
-				"x": token.global_position.x, "y": token.global_position.y, 
+				"x": token.global_position.x, "y": token.global_position.y,
 				"art_path": token.art_path, "height_offset": token.height_offset, "data": token.data
 			})
 	for wall in wall_layer.get_children():
@@ -636,7 +663,7 @@ func _on_gm_dashboard_scene_switched(new_scene_id: String):
 		gm_dashboard.map_scale_spin_box.value = loaded_scale
 		_on_gm_dashboard_map_scale_changed(loaded_scale)
 	else:
-		map_layer.texture = null 
+		map_layer.texture = null
 		current_map_path = ""
 		
 	for t_data in new_scene_data.get("tokens", []):
@@ -735,7 +762,7 @@ func receive_spawn_vault_token(v_data: Dictionary, pos: Vector2, token_id: Strin
 
 # 1. Spawning a Generic Monster
 func spawn_dropped_token(image_path: String, is_enemy: bool, drop_pos: Vector2):
-	if not multiplayer.is_server(): return 
+	if not multiplayer.is_server(): return
 		
 	var unique_id = "Token_" + str(Time.get_ticks_msec()) + "_" + str(randi() % 1000)
 	var snapped_pos = get_snapped_center(drop_pos)
@@ -848,7 +875,7 @@ func _on_roster_button_pressed(target_id: int):
 	
 	# Security Check 1: Are WE currently a GM? (Players can't promote people)
 	if not connected_players.has(my_id) or connected_players[my_id]["role"] != "GM":
-		return 
+		return
 		
 	# Security Check 2: Don't let the Host accidentally demote themselves!
 	if target_id == 1:
@@ -903,7 +930,7 @@ func request_board_sync():
 	for token in token_layer.get_children():
 		if "data" in token:
 			live_scene_data["tokens"].append({
-				"name": token.name, 
+				"name": token.name,
 				"x": token.global_position.x, "y": token.global_position.y,
 				"art_path": token.art_path, "height_offset": token.height_offset, "data": token.data
 			})
@@ -992,8 +1019,20 @@ func receive_quests_update(updated_quests: Array):
 
 # --- TOKEN DATA SYNCING ---
 func broadcast_token_data_update(token_name: String, key: String, new_value: Variant):
+	# --- FIX: ALWAYS APPLY LOCALLY FIRST ---
+	# This forces the token to run its update_data() immediately 
+	# so the local player/GM sees the change (Name/HP/etc) instantly.
+	var target_token = token_layer.get_node_or_null(token_name)
+	if target_token and target_token.has_method("update_data"):
+		target_token.update_data(key, new_value, true)
+
+	# --- GM Auto-Sort Hook ---
+	if key in ["current_init", "init_bonus", "initiative"] and multiplayer.is_server():
+		_refresh_and_sync_initiative()
+		
+	# --- NETWORK DISTRIBUTION ---
 	if multiplayer.is_server():
-		# The GM beams it directly to everyone
+		# The GM beams it directly to everyone else
 		rpc("receive_token_data_update", token_name, key, new_value)
 	else:
 		# Players ask the GM's computer to distribute the data
@@ -1013,6 +1052,10 @@ func receive_token_data_update(token_name: String, key: String, new_value: Varia
 	if target_token and target_token.has_method("update_data"):
 		# We pass "true" so the token knows this came from the internet, preventing infinite loops!
 		target_token.update_data(key, new_value, true)
+		
+		# ---  GM Auto-Sort Hook for PLAYER changes ---
+		if key in ["current_init", "init_bonus", "initiative"] and multiplayer.is_server():
+			_refresh_and_sync_initiative()
 
 # ==========================================
 # TOKEN OWNERSHIP & HIDING
@@ -1069,25 +1112,201 @@ func receive_token_owner(token_name: String, new_owner_name: String): # Changed 
 		token.update_data("owner_id", new_owner_name)
 
 # ==========================================
+# MODULAR INVENTORY SYSTEM
+# ==========================================
+
+# 1. Triggered by the Token Menu
+func open_inventory_window(target_uuid: String, character_name: String):
+	currently_viewed_backpack_uuid = target_uuid
+	
+	if not CampaignManager.campaign_data["backpacks"].has(target_uuid):
+		CampaignManager.campaign_data["backpacks"][target_uuid] = []
+		
+	var items = CampaignManager.campaign_data["backpacks"][target_uuid]
+	
+	inv_window.populate(character_name, items)
+	inv_window.visible = true
+
+# 2. Triggered by the Inventory Window
+func _on_inv_add_item(item_name: String, item_desc: String):
+	if currently_viewed_backpack_uuid == "": return
+	
+	var item_id = "item_" + str(Time.get_ticks_msec()) + "_" + str(randi() % 1000)
+	var new_item = { "id": item_id, "name": item_name, "desc": item_desc }
+	
+	if multiplayer.is_server():
+		receive_inventory_action("add", currently_viewed_backpack_uuid, new_item)
+	else:
+		rpc_id(1, "request_inventory_action", "add", currently_viewed_backpack_uuid, new_item)
+
+func _on_inv_delete_item(item_id: String):
+	if currently_viewed_backpack_uuid == "": return
+	
+	if multiplayer.is_server():
+		receive_inventory_action("delete", currently_viewed_backpack_uuid, {"id": item_id})
+	else:
+		rpc_id(1, "request_inventory_action", "delete", currently_viewed_backpack_uuid, {"id": item_id})
+
+# 3. The Network Math
+@rpc("any_peer", "call_remote", "reliable")
+func request_inventory_action(action: String, target_uuid: String, payload: Dictionary):
+	if not multiplayer.is_server(): return
+	
+	var sender_id = multiplayer.get_remote_sender_id()
+	var sender_uuid = connected_players[sender_id]["uuid"] if connected_players[sender_id].has("uuid") else ""
+	var sender_is_gm = connected_players[sender_id]["role"] == "GM"
+	
+	# SECURITY: Players can only edit their own backpack! GM can edit anyone's.
+	if not sender_is_gm and target_uuid != sender_uuid:
+		print("Security Block: Player tried to edit someone else's inventory!")
+		return
+		
+	receive_inventory_action(action, target_uuid, payload)
+
+func receive_inventory_action(action: String, target_uuid: String, payload: Dictionary):
+	if not CampaignManager.campaign_data["backpacks"].has(target_uuid):
+		CampaignManager.campaign_data["backpacks"][target_uuid] = []
+		
+	var backpack = CampaignManager.campaign_data["backpacks"][target_uuid]
+	
+	if action == "add":
+		backpack.append(payload)
+	elif action == "delete":
+		for i in range(backpack.size() -1, -1, -1):
+			if backpack[i]["id"] == payload["id"]:
+				backpack.remove_at(i)
+				break
+				
+	rpc("sync_single_backpack", target_uuid, backpack)
+	sync_single_backpack(target_uuid, backpack) # Run locally for the GM
+
+@rpc("authority", "call_remote", "reliable")
+func sync_single_backpack(target_uuid: String, updated_items: Array):
+	CampaignManager.campaign_data["backpacks"][target_uuid] = updated_items
+	
+	# If I am currently looking at this exact backpack, refresh my screen!
+	if inv_window.visible and currently_viewed_backpack_uuid == target_uuid:
+		var char_name = inv_window.title_label.text.replace("'s Backpack", "")
+		inv_window.populate(char_name, updated_items)
+
+# --- CHARACTER SHEET TRIGGER ---
+func open_character_sheet_for_token(token_name: String):
+	var token = token_layer.get_node_or_null(token_name)
+	if not token: return
+	
+	# If the sheet template is missing or empty, force it to load D&D 5e by default!
+	if not CampaignManager.campaign_data.has("sheet_template") or CampaignManager.campaign_data["sheet_template"].is_empty():
+		# IMPORTANT: Change "dnd5e_template" below to whatever your actual variable 
+		# is named inside your SheetTemplates.gd autoload file!
+		CampaignManager.campaign_data["sheet_template"] = SheetTemplates.TEMPLATES["dnd_5e"]
+	
+	# We duplicate the token's brain and manually inject the art path 
+	# so the Character Sheet UI can find it!
+	var combined_data = token.data.duplicate()
+	combined_data["art_path"] = token.art_path
+	
+	# Pass the combined data into the sheet generator
+	char_sheet_window.generate_ui(CampaignManager.campaign_data["sheet_template"], combined_data, token.name)
+	
+	# Show the window and bring it to the front
+	char_sheet_window.visible = true
+	char_sheet_window.move_to_front()
+
+# ==========================================
 # CHAT AND DICE LOG
 # ==========================================
+
+func _on_character_sheet_roll(char_name: String, roll_name: String, modifier: int, dice_logic: String = "d20_high") -> void:
+	var result_text = ""
+	
+	# --- 1. D&D 5e MATH (1d20 + Modifier) ---
+	if dice_logic == "d20_high":
+		var d20 = randi_range(1, 20)
+		var total = d20 + modifier
+		var sign_str = "+" if modifier >= 0 else ""
+		
+		result_text = char_name + " rolled " + roll_name + ":\n"
+		result_text += "[color=yellow]d20 (" + str(d20) + ") " + sign_str + str(modifier) + " = " + str(total) + "[/color]"
+
+	# --- 2. DELTA GREEN MATH (1d100 Roll Under Target) ---
+	elif dice_logic == "d100_under":
+		# In DG, the "modifier" passed from the sheet is actually the Target % 
+		var d100 = randi_range(1, 100)
+		var is_success = d100 <= modifier
+		
+		var outcome = "[color=green]SUCCESS[/color]" if is_success else "[color=red]FAILURE[/color]"
+		
+		# Delta Green Criticals (01, or matching dice like 11, 22, 99) and Fumbles (100)
+		if d100 == 1 or (d100 <= modifier and d100 % 11 == 0):
+			outcome = "[color=gold]CRITICAL SUCCESS![/color]"
+		elif d100 == 100 or (d100 > modifier and d100 % 11 == 0):
+			outcome = "[color=darkred]FUMBLE![/color]"
+			
+		result_text = char_name + " rolled " + roll_name + " (Target " + str(modifier) + "%):\n"
+		result_text += "Rolled: [color=yellow]" + str(d100) + "[/color] -> " + outcome
+
+	# --- 3. SHINOBIGAMI MATH (2d6 + Modifier) ---
+	elif dice_logic == "2d6_high":
+		var d1 = randi_range(1, 6)
+		var d2 = randi_range(1, 6)
+		var total = d1 + d2 + modifier
+		var sign_str = ""
+		
+		if modifier != 0:
+			sign_str = ("+" if modifier > 0 else "") + str(modifier)
+			
+		result_text = char_name + " rolled " + roll_name + ":\n"
+		result_text += "[color=yellow]2d6 (" + str(d1) + " + " + str(d2) + ")" + sign_str + " = " + str(total) + "[/color]"
+	
+	# --- BROADCAST & WHISPER LOGIC ---
+	var my_name = GameState.player_name
+	if my_name == "": my_name = "GM" if GameState.is_gm_mode else "Player"
+	var color = "#ffd700" if GameState.is_gm_mode else "#99ccff" 
+	
+	var actual_is_whisper = false
+	if whisper_check:
+		actual_is_whisper = whisper_check.button_pressed
+	
+	if actual_is_whisper:
+		# Format a sneaky purple message for secrets!
+		var secret_msg = "[color=#b266ff][i](Whisper)[/i]\n" + result_text + "[/color]"
+		
+		# 1. Print locally so the roller sees their own secret roll
+		receive_chat_message(my_name, secret_msg, color)
+		
+		# 2. If the roller is NOT the GM, beam it specifically to the GM (Host ID 1)
+		if not multiplayer.is_server():
+			rpc_id(1, "receive_chat_message", my_name, secret_msg, color)
+			
+	else:
+		# Public Roll!
+		rpc("receive_chat_message", my_name, "\n" + result_text, color)
+	
 
 func _on_chat_send_pressed():
 	var text = chat_input.text.strip_edges()
 	if text == "": return
 	
-	chat_input.text = "" # Clear the box
 	var my_name = GameState.player_name
 	var color = "#ffd700" if GameState.is_gm_mode else "#99ccff" # Gold for GM, Blue for Player
 	
 	# Broadcast to everyone (and ourselves!)
 	rpc("receive_chat_message", my_name, text, color)
+	chat_input.text = ""
 
-@rpc("any_peer", "call_local", "reliable") 
+@rpc("any_peer", "call_local" ,"reliable")
 func receive_chat_message(sender_name: String, text: String, color_hex: String):
-	# BBCode formats it like: "[Gold]Dave:[/Gold] Hello world!"
-	var formatted_msg = "[color=%s][b]%s:[/b][/color] %s\n" % [color_hex, sender_name, text]
+	# 1. Format the message
+	var formatted_msg = "[color=%s][b]%s:[/b][/color] %s\n\n" % [color_hex, sender_name, text]
+	
+	print("Attempting to add to chat: ", formatted_msg)
+	# 2. Add the text
 	chat_log.append_text(formatted_msg)
+	
+	# 3. FORCE SCROLL: This calculates the total lines and jumps to the end
+	# We call this on the next frame to ensure the label has finished calculating the new text height
+	await get_tree().process_frame 
+	chat_log.scroll_to_line(chat_log.get_line_count() - 1)
 
 # For secret rolls, we only send the text directly to the Host (ID 1)
 @rpc("any_peer", "call_remote", "reliable")
@@ -1097,10 +1316,38 @@ func receive_whisper(formatted_msg: String):
 # ==========================================
 # INITIATIVE RECEIVER
 # ==========================================
+func _refresh_and_sync_initiative():
+	var all_tokens = $TokenLayer.get_children()
+	var active_tokens = []
+	
+	# Gather everyone who has rolled higher than 0
+	for token in all_tokens:
+		if "data" in token and token.data.get("current_init", 0) > 0:
+			active_tokens.append(token)
+			
+	# Sort them using your existing highest-to-lowest function
+	active_tokens.sort_custom(_sort_highest_init)
+	
+	# 1. Update the GM's local UI
+	_populate_initiative_ui(active_tokens)
+	
+	# 2. Build the exact "Scoreboard" format your players expect
+	var sync_data = []
+	for t in active_tokens:
+		sync_data.append({
+			"name": t.data["name"],
+			"init": t.data["current_init"],
+			"faction": t.data.get("faction", "neutral")
+		})
+		
+	# 3. Beam the perfectly sorted scoreboard to everyone!
+	rpc("receive_initiative_sync", sync_data)
+
+
 @rpc("authority", "call_remote", "reliable")
 func receive_initiative_sync(sync_data: Array):
 	# 1. Wipe the old list clean
-	for child in token_list.get_children(): 
+	for child in token_list.get_children():
 		child.queue_free()
 		
 	# 2. If it's a reset (empty array), stop here
@@ -1113,7 +1360,7 @@ func receive_initiative_sync(sync_data: Array):
 		
 		var name_label = Label.new()
 		name_label.text = item["name"]
-		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL 
+		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		
 		var score_label = Label.new()
 		score_label.text = str(item["init"])

@@ -1,0 +1,76 @@
+[gd_scene format=3 uid="uid://2a0h66dq03v1"]
+
+[ext_resource type="Script" uid="uid://dgyiwpeco6t2g" path="res://Scripts/add_blueprint_popup.gd" id="1_2wdkt"]
+
+[node name="AddBlueprintPopup" type="Window" unique_id=1826963280]
+oversampling_override = 1.0
+position = Vector2i(0, 36)
+size = Vector2i(300, 200)
+script = ExtResource("1_2wdkt")
+
+[node name="MarginContainer" type="MarginContainer" parent="." unique_id=71453406]
+offset_right = 40.0
+offset_bottom = 40.0
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer" unique_id=1105583168]
+layout_mode = 2
+
+[node name="TabSelector" type="OptionButton" parent="MarginContainer/VBoxContainer" unique_id=1604325897]
+layout_mode = 2
+
+[node name="TypeRow" type="HBoxContainer" parent="MarginContainer/VBoxContainer" unique_id=719096484]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="MarginContainer/VBoxContainer/TypeRow" unique_id=1125761311]
+layout_mode = 2
+text = "Type"
+
+[node name="TypeDropdown" type="OptionButton" parent="MarginContainer/VBoxContainer/TypeRow" unique_id=334080928]
+layout_mode = 2
+item_count = 2
+popup/item_0/text = "Attribute"
+popup/item_0/id = 0
+popup/item_1/text = "Skill"
+popup/item_1/id = 1
+
+[node name="NameRow" type="HBoxContainer" parent="MarginContainer/VBoxContainer" unique_id=987150572]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="MarginContainer/VBoxContainer/NameRow" unique_id=1078061149]
+layout_mode = 2
+text = "Name"
+
+[node name="NameInput" type="LineEdit" parent="MarginContainer/VBoxContainer/NameRow" unique_id=1394434436]
+layout_mode = 2
+placeholder_text = "Disguise"
+
+[node name="LinkRow" type="HBoxContainer" parent="MarginContainer/VBoxContainer" unique_id=1392238211]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="MarginContainer/VBoxContainer/LinkRow" unique_id=2040108203]
+layout_mode = 2
+text = "Linked stat"
+
+[node name="LinkDropdown" type="OptionButton" parent="MarginContainer/VBoxContainer/LinkRow" unique_id=982308045]
+layout_mode = 2
+item_count = 6
+popup/item_0/text = "str"
+popup/item_0/id = 0
+popup/item_1/text = "dex"
+popup/item_1/id = 1
+popup/item_2/text = "con"
+popup/item_2/id = 2
+popup/item_3/text = "int"
+popup/item_3/id = 3
+popup/item_4/text = "wis"
+popup/item_4/id = 4
+popup/item_5/text = "cha"
+popup/item_5/id = 5
+
+[node name="AddButton" type="Button" parent="MarginContainer/VBoxContainer" unique_id=334016457]
+layout_mode = 2
+text = "Add to sheet"

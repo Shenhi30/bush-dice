@@ -6,7 +6,7 @@ var is_logged_in: bool = false   # Helps guards scenes from unauthorized access
 var session_token: String = ""   # Optional: useful for direct API calls
 
 # --- GM & PLAYER ROLES ---
-var is_gm_mode: bool = false 
+var is_gm_mode: bool = false
 var is_gm_vision_active: bool = false 
 var player_name: String = ""
 

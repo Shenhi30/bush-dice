@@ -1,0 +1,14 @@
+[gd_scene format=3 uid="uid://di4ikreph1emq"]
+
+[node name="TextRow" type="HBoxContainer" unique_id=795610323]
+offset_right = 13.0
+offset_bottom = 127.0
+size_flags_horizontal = 3
+
+[node name="StatName" type="Label" parent="." unique_id=2006596928]
+custom_minimum_size = Vector2(120, 0)
+layout_mode = 2
+
+[node name="TextInput" type="LineEdit" parent="." unique_id=2144259328]
+layout_mode = 2
+size_flags_horizontal = 3

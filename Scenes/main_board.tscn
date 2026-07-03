@@ -7,6 +7,8 @@
 [ext_resource type="PackedScene" uid="uid://rq2pa5oxxsa1" path="res://UI/gm_dashboard.tscn" id="4_u7eij"]
 [ext_resource type="Script" uid="uid://dbvpg2fnr187e" path="res://Scripts/DropZone.gd" id="5_d5o86"]
 [ext_resource type="Script" uid="uid://5utvh4al0krb" path="res://Scripts/QuestTracker.gd" id="7_d5o86"]
+[ext_resource type="PackedScene" uid="uid://qdo3ljfkise1" path="res://Scenes/inventory_window.tscn" id="7_wxlku"]
+[ext_resource type="PackedScene" uid="uid://c7o6bdrv70rlo" path="res://UI/character_sheet_window.tscn" id="8_cvtiy"]
 
 [sub_resource type="Gradient" id="Gradient_m4kfr"]
 
@@ -60,9 +62,10 @@ anchor_right = 1.0
 offset_left = -155.0
 offset_bottom = 648.0
 grow_horizontal = 0
-current_tab = 0
+current_tab = 1
 
 [node name="InitiativeTracker" type="PanelContainer" parent="UILayer/TabContainer" unique_id=808262133]
+visible = false
 layout_mode = 2
 mouse_filter = 1
 metadata/_tab_index = 0
@@ -95,7 +98,6 @@ layout_mode = 2
 layout_mode = 2
 
 [node name="ChatPanel" type="Panel" parent="UILayer/TabContainer" unique_id=1959821814]
-visible = false
 layout_mode = 2
 mouse_filter = 1
 metadata/_tab_index = 1
@@ -105,8 +107,15 @@ layout_mode = 0
 offset_right = 187.0
 offset_bottom = 577.0
 
-[node name="ChatLog" type="RichTextLabel" parent="UILayer/TabContainer/ChatPanel/VBoxContainer" unique_id=966366671]
+[node name="ScrollContainer" type="ScrollContainer" parent="UILayer/TabContainer/ChatPanel/VBoxContainer" unique_id=1076809599]
+custom_minimum_size = Vector2(187, 550)
 layout_mode = 2
+size_flags_vertical = 3
+vertical_scroll_mode = 2
+
+[node name="ChatLog" type="RichTextLabel" parent="UILayer/TabContainer/ChatPanel/VBoxContainer/ScrollContainer" unique_id=966366671]
+layout_mode = 2
+size_flags_horizontal = 3
 size_flags_vertical = 3
 bbcode_enabled = true
 text = "Chat log"
@@ -207,6 +216,16 @@ grow_horizontal = 2
 grow_vertical = 0
 mouse_filter = 1
 script = ExtResource("7_d5o86")
+
+[node name="InventoryWindow" parent="UILayer" unique_id=2073021464 instance=ExtResource("7_wxlku")]
+visible = false
+offset_left = 107.0
+offset_top = 41.0
+offset_right = 507.0
+offset_bottom = 541.0
+
+[node name="CharacterSheetWindow" parent="UILayer" unique_id=1768750079 instance=ExtResource("8_cvtiy")]
+visible = false
 
 [node name="BackgroundDropLayer" type="CanvasLayer" parent="." unique_id=471475110]
 layer = 9

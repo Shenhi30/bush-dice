@@ -11,9 +11,9 @@ config_version=5
 [application]
 
 config/name="BushDice"
-config/version="0.8"
+config/version="0.9"
 run/main_scene="uid://x4os0solslq1"
-config/features=PackedStringArray("4.6", "Forward Plus")
+config/features=PackedStringArray("4.7", "Forward Plus")
 config/icon="res://icon.svg"
 
 [autoload]
@@ -22,6 +22,7 @@ GameState="*uid://bdkelaevlcl3h"
 CampaignManager="*uid://wubqnymrd8h"
 NetworkManager="*uid://bhshmfunw3xiv"
 Supabase="*uid://cg2ofs0743kte"
+SheetTemplates="*uid://b770yrqg2htx7"
 
 [editor_plugins]
 
