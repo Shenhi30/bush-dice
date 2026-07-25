@@ -75,12 +75,9 @@ func _ready():
 	map_close.pressed.connect(func(): map_drawer.hide())
 	token_close.pressed.connect(func(): token_drawer.hide())
 	# 3. When a file is chosen, turn it into a button in the drawer!
-	map_file_dialog.file_selected.connect(func(path): _create_image_button(path, map_grid, true))
-	token_file_dialog.file_selected.connect(func(path): _create_image_button(path, token_grid, false))
+	
 	
 	# 4. Auto-generate the default folders on startup
-	_generate_thumbnails(MAPS_FOLDER, map_grid, true)
-	_generate_thumbnails(TOKENS_FOLDER, token_grid, false)
 	
 	$HBoxContainer/SaveCampaignBtn.pressed.connect(func(): save_file_dialog.popup_centered_ratio(0.7))
 	$HBoxContainer/LoadCampaignBtn.pressed.connect(func(): load_file_dialog.popup_centered_ratio(0.7))
@@ -91,19 +88,11 @@ func _ready():
 	
 	refresh_party_ui()
 	refresh_token_library()
+	refresh_map_library()
+	
 	# --- SCENE SWITCHER LOGIC ---
 	# 1. Fill the dropdown with scenes from the CampaignManager
-	scene_dropdown.clear()
-	var current_scene = CampaignManager.campaign_data["active_scene_id"]
-	var index = 0
-	
-	for scene_id in CampaignManager.campaign_data["scenes"].keys():
-		scene_dropdown.add_item(scene_id)
-		# If this is the scene we are currently on, select it in the UI!
-		if scene_id == current_scene:
-			scene_dropdown.select(index)
-		index += 1
-		
+	refresh_scene_dropdown()
 	# 2. Wire the buttons
 	scene_dropdown.item_selected.connect(_on_scene_dropdown_selected)
 	add_scene_btn.pressed.connect(func(): create_new_scene_requested.emit())
@@ -122,7 +111,7 @@ func _ready():
 			rename_scene_requested.emit(new_name)
 	)
 	
-	# --- NEW: SYSTEM DROPDOWN SETUP ---
+	# --- SYSTEM DROPDOWN SETUP ---
 	system_dropdown.clear()
 	for system_id in SheetTemplates.TEMPLATES.keys():
 		# Capitalize makes "dnd_5e" look like "Dnd_5e" in the UI
@@ -242,33 +231,81 @@ func refresh_map_library():
 	for child in map_grid.get_children():
 		child.queue_free()
 		
-	var path = "user://maps/"
-	var dir = DirAccess.open(path)
+	var base_path = "user://maps/"
+	var dir = DirAccess.open(base_path)
+	if not dir: return
 	
-	if dir:
-		dir.list_dir_begin()
-		var file_name = dir.get_next()
-		
-		while file_name != "":
-			if not dir.current_is_dir() and (file_name.ends_with(".png") or file_name.ends_with(".jpg")):
-				spawn_map_icon(path + file_name)
-			file_name = dir.get_next()
+	# 1. Automatically generate standard folders if they are missing
+	var default_groups = ["Cities", "Dungeons", "Encounters", "World", "Uncategorized"]
+	for group in default_groups:
+		if not dir.dir_exists(group):
+			dir.make_dir(group)
+			
+	# 2. Build groups for EVERY subfolder it finds (including your Uncategorized folder!)
+	var directories = dir.get_directories()
+	
+	# Optional: Sort them alphabetically so they look nice
+	directories.sort() 
+	
+	for d in directories:
+		# This will build a UI group for Dungeons, Encounters, Uncategorized, World, etc.
+		_build_map_group(base_path + d + "/", d, map_grid)
 
-# 4. Create the drawer icon
-func spawn_map_icon(file_path: String):
+# --- NEW HELPER FUNCTION ---
+func _build_map_group(folder_path: String, group_name: String, parent_node: Node):
+	var dir = DirAccess.open(folder_path)
+	if not dir: return
+	
+	# Scan for images in this specific folder (case-insensitive)
+	var valid_files = []
+	dir.list_dir_begin()
+	var file_name = dir.get_next()
+	while file_name != "":
+		var ext = file_name.to_lower()
+		if not dir.current_is_dir() and (ext.ends_with(".png") or ext.ends_with(".jpg") or ext.ends_with(".jpeg") or ext.ends_with(".webp")):
+			valid_files.append(file_name)
+		file_name = dir.get_next()
+	
+	# Create a visual Header for the category
+	var header = Label.new()
+	header.text = "=== " + group_name.to_upper() + " ==="
+	header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	header.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8))
+	parent_node.add_child(header)
+	
+	# If empty, show a small label instead of a grid
+	if valid_files.is_empty():
+		var empty_label = Label.new()
+		empty_label.text = "(No maps in this folder)"
+		empty_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		empty_label.add_theme_color_override("font_color", Color(0.4, 0.4, 0.4))
+		parent_node.add_child(empty_label)
+		return
+	
+	# Create a Grid specifically for this category's maps
+	var grid = GridContainer.new()
+	grid.columns = 4
+	parent_node.add_child(grid)
+	
+	# Spawn the map icons directly into this grid
+	for f in valid_files:
+		var full_path = folder_path + f if folder_path.ends_with("/") else folder_path + "/" + f
+		spawn_map_icon(full_path, grid)
+
+# --- UPDATED SPAWN FUNCTION (Now takes a target_grid parameter) ---
+func spawn_map_icon(file_path: String, target_grid: GridContainer):
 	var icon_scene = preload("res://UI/MapLibraryItem.tscn")
 	var new_icon = icon_scene.instantiate()
 	
 	var img = Image.load_from_file(file_path)
 	new_icon.texture = ImageTexture.create_from_image(img)
 	
-	# Maps usually look better as wide rectangles
 	new_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	new_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	new_icon.custom_minimum_size = Vector2(150, 100) 
 	
 	new_icon.map_image_path = file_path
-	map_grid.add_child(new_icon)
+	target_grid.add_child(new_icon)
 
 func refresh_party_ui():
 	# 1. Clear the old list
@@ -319,6 +356,52 @@ func _on_system_changed(index: int):
 	# This triggers the CampaignManager to update the template and emit the signal
 	CampaignManager.set_campaign_system(selected_id)
 
+func refresh_scene_dropdown():
+	scene_dropdown.clear()
+	var current_scene = CampaignManager.campaign_data.get("active_scene_id", "")
+	var scenes = CampaignManager.campaign_data["scenes"].keys()
+	
+	var grouped_scenes = {}
+	for scene_id in scenes:
+		var group_name = "Uncategorized"
+		var display_name = scene_id
+		
+		# If the GM used a colon (e.g., "City: Capital"), split it into a group!
+		if ":" in scene_id:
+			var parts = scene_id.split(":", true, 1)
+			group_name = parts[0].strip_edges()
+			display_name = parts[1].strip_edges()
+			
+		if not grouped_scenes.has(group_name):
+			grouped_scenes[group_name] = []
+			
+		# We store BOTH the clean display name, and the true scene_id
+		grouped_scenes[group_name].append({"id": scene_id, "display": display_name})
+		
+	var current_index = 0
+	var active_index = -1
+	
+	# Sort the groups alphabetically
+	var sorted_groups = grouped_scenes.keys()
+	sorted_groups.sort()
+	
+	for group in sorted_groups:
+		# Add a visual, unclickable header!
+		scene_dropdown.add_separator(group)
+		current_index += 1
+		
+		for scene_data in grouped_scenes[group]:
+			scene_dropdown.add_item(scene_data["display"])
+			# Hide the REAL scene ID in the item's metadata so the game doesn't get confused
+			scene_dropdown.set_item_metadata(current_index, scene_data["id"])
+			
+			if scene_data["id"] == current_scene:
+				active_index = current_index
+				
+			current_index += 1
+			
+	if active_index != -1:
+		scene_dropdown.select(active_index)
 
 # Connect the "pressed" signal from your Minus button to this
 func _on_scale_minus_btn_pressed() -> void:
@@ -369,8 +452,13 @@ func _on_measure_tool_btn_toggled(toggled_on: bool) -> void:
 		tool_mode_changed.emit(3)
 
 func _on_scene_dropdown_selected(index: int):
-	var selected_scene_id = scene_dropdown.get_item_text(index)
-	scene_switched.emit(selected_scene_id)
+	var selected_scene_id = scene_dropdown.get_item_metadata(index)
+	
+	if selected_scene_id != null:
+		scene_switched.emit(selected_scene_id)
+	else:
+		# Safety fallback: If they somehow click a separator header, snap them back
+		refresh_scene_dropdown()
 
 func _on_open_folders_btn_pressed() -> void:
 	# 1. Translate the safe 'user://' path into a real Windows/Mac/Linux path
@@ -401,7 +489,7 @@ func _on_token_file_dialog_file_selected(path: String) -> void:
 func _on_map_file_dialog_file_selected(path: String) -> void:
 		# 1. Get the filename (e.g., "bounty_hunter.png")
 	var file_name = path.get_file()
-	var destination = "user://maps/" + file_name
+	var destination = "user://maps/Uncategorized/" + file_name
 	
 	# 2. Copy the file into your internal library
 	# We use copy_absolute because the original file is outside the project

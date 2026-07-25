@@ -13,6 +13,7 @@ var connected_players: Dictionary = {} # Stores ID -> {name, role}
 # --- QUEST DATA ---
 var quests: Array = []
 var current_map_path: String = ""
+var is_loading_game: bool = false
 
 @onready var quest_tracker = $UILayer/CodeQuestTracker
 @onready var wall_layer = $WallLayer
@@ -99,7 +100,8 @@ func _ready():
 	autosave_timer.wait_time = 5.0
 	autosave_timer.autostart = true
 	autosave_timer.timeout.connect(func():
-		if multiplayer.is_server() and CampaignManager.current_save_path != "":
+		# Do not autosave if we don't have a path, OR if we are currently loading!
+		if multiplayer.is_server() and CampaignManager.current_save_path != "" and not is_loading_game:
 			_on_gm_dashboard_save_requested(CampaignManager.current_save_path)
 			print("Game Auto-Saved!")
 	)
@@ -141,6 +143,11 @@ func _ready():
 	
 	if not CampaignManager.campaign_data.has("backpacks"):
 		CampaignManager.campaign_data["backpacks"] = {}
+		
+	# If the Main Menu passed a save file path, force the board to load it immediately!
+	if CampaignManager.current_save_path != "":
+		# We must defer the call until the end of the frame so all UI nodes are fully ready
+		call_deferred("_on_gm_dashboard_load_requested", CampaignManager.current_save_path)
 
 func _get_token_under_mouse(mouse_pos: Vector2):
 	var tokens = token_layer.get_children()
@@ -417,6 +424,35 @@ func _on_fog_bypass_toggled(is_bypassed: bool) -> void:
 func add_token_to_board(token_node):
 	token_layer.add_child(token_node)
 
+func _get_safe_drop_position(start_pos: Vector2) -> Vector2:
+	var grid_size = 64.0
+	
+	# A search pattern: Center, Right, Left, Down, Up, and Corners
+	var search_pattern = [
+		Vector2.ZERO, Vector2.RIGHT, Vector2.LEFT, Vector2.DOWN, Vector2.UP,
+		Vector2(1, 1), Vector2(-1, -1), Vector2(1, -1), Vector2(-1, 1),
+		Vector2(2, 0), Vector2(-2, 0), Vector2(0, 2), Vector2(0, -2)
+	]
+	
+	for offset in search_pattern:
+		var test_pos = start_pos + (offset * grid_size)
+		var is_occupied = false
+		
+		# Check if any token is already sitting at this exact spot
+		for token in token_layer.get_children():
+			if token.global_position.distance_to(test_pos) < 10.0:
+				is_occupied = true
+				break
+				
+		# If we found an empty square, return it immediately!
+		if not is_occupied:
+			return test_pos
+			
+	# Fallback if the board is completely packed
+	return start_pos + (Vector2.RIGHT * grid_size)
+
+
+
 func _on_gm_dashboard_spawn_token_requested(image_path: String, y_offset: float, is_enemy_flag: bool) -> void:
 	if not multiplayer.is_server(): return
 	var unique_id = "Token_" + str(Time.get_ticks_msec()) + "_" + str(randi() % 10000)
@@ -557,17 +593,39 @@ func _on_gm_dashboard_save_requested(path: String):
 	CampaignManager.campaign_data["scenes"][current_scene_id] = scene_data
 	CampaignManager.campaign_data["quests"] = quest_tracker.quests
 	
-	var file = FileAccess.open(path, FileAccess.WRITE)
-	if file:
-		file.store_string(JSON.stringify(CampaignManager.campaign_data, "\t"))
+	var json_string = JSON.stringify(CampaignManager.campaign_data, "\t")
+	if json_string == "":
+		print("Save Aborted: JSON was empty.")
+		return
+		
+	# 1. Save to a temporary file first!
+	var temp_path = path + ".tmp"
+	var temp_file = FileAccess.open(temp_path, FileAccess.WRITE)
+	
+	if temp_file:
+		temp_file.store_string(json_string)
+		temp_file.close()
+		
+		# 2. If the temporary file succeeded, safely replace the real file!
+		DirAccess.remove_absolute(path) # Delete the old save
+		DirAccess.rename_absolute(temp_path, path) # Rename .tmp to .json
+		
 		CampaignManager.current_save_path = path
 
 func _on_gm_dashboard_load_requested(path: String):
+	is_loading_game = true
+	
 	var file = FileAccess.open(path, FileAccess.READ)
 	if not file: return
-	var loaded_data = JSON.parse_string(file.get_as_text())
-	if typeof(loaded_data) != TYPE_DICTIONARY or not loaded_data.has("active_scene_id"): return
+	# 1. Grab the text from the file
+	var text_data = file.get_as_text()
 	
+	# 2. IMMEDIATELY close the file lock so autosaves can use it!
+	file.close() 
+	
+	# 3. Parse the text we safely grabbed
+	var loaded_data = JSON.parse_string(text_data)
+	if typeof(loaded_data) != TYPE_DICTIONARY or not loaded_data.has("active_scene_id"): return
 	CampaignManager.campaign_data = loaded_data
 	CampaignManager.current_save_path = path
 	
@@ -576,18 +634,13 @@ func _on_gm_dashboard_load_requested(path: String):
 	if not CampaignManager.campaign_data.has("pc_vault"):
 		CampaignManager.campaign_data["pc_vault"] = {}
 	
-	gm_dashboard.scene_dropdown.clear()
-	var active_scene = CampaignManager.campaign_data["active_scene_id"]
-	var index = 0
-	for scene_id in CampaignManager.campaign_data["scenes"].keys():
-		gm_dashboard.scene_dropdown.add_item(scene_id)
-		if scene_id == active_scene: gm_dashboard.scene_dropdown.select(index)
-		index += 1
+	gm_dashboard.refresh_scene_dropdown()
 		
 	for token in token_layer.get_children(): token.queue_free()
 	for wall in wall_layer.get_children(): wall.queue_free()
 	selected_tokens.clear()
 	
+	var active_scene = CampaignManager.campaign_data["active_scene_id"]
 	var scene_data = CampaignManager.campaign_data["scenes"][active_scene]
 	if scene_data.get("map_image_path", "") != "":
 		_on_gm_dashboard_map_loaded(scene_data["map_image_path"])
@@ -687,9 +740,9 @@ func _on_gm_dashboard_create_new_scene_requested():
 	var scene_count = CampaignManager.campaign_data["scenes"].size() + 1
 	var new_id = "map_" + str(scene_count)
 	CampaignManager.campaign_data["scenes"][new_id] = {"map_image_path": "", "map_scale": 1.0, "tokens": [], "walls": []}
-	gm_dashboard.scene_dropdown.add_item(new_id)
-	gm_dashboard.scene_dropdown.select(gm_dashboard.scene_dropdown.get_item_count() - 1)
-	_on_gm_dashboard_scene_switched(new_id)
+	
+	_on_gm_dashboard_scene_switched(new_id) # Switch the engine first
+	gm_dashboard.refresh_scene_dropdown() # Then rebuild the UI
 
 func _on_gm_dashboard_rename_scene_requested(new_name: String):
 	var old_name = CampaignManager.campaign_data["active_scene_id"]
@@ -699,12 +752,7 @@ func _on_gm_dashboard_rename_scene_requested(new_name: String):
 	CampaignManager.campaign_data["scenes"][new_name] = scene_data
 	CampaignManager.campaign_data["active_scene_id"] = new_name
 	
-	gm_dashboard.scene_dropdown.clear()
-	var index = 0
-	for scene_id in CampaignManager.campaign_data["scenes"].keys():
-		gm_dashboard.scene_dropdown.add_item(scene_id)
-		if scene_id == new_name: gm_dashboard.scene_dropdown.select(index)
-		index += 1
+	gm_dashboard.refresh_scene_dropdown()
 
 func _on_gm_dashboard_spawn_party_requested():
 	# Drop the party exactly where the GM is currently looking!
@@ -765,7 +813,7 @@ func spawn_dropped_token(image_path: String, is_enemy: bool, drop_pos: Vector2):
 	if not multiplayer.is_server(): return
 		
 	var unique_id = "Token_" + str(Time.get_ticks_msec()) + "_" + str(randi() % 1000)
-	var snapped_pos = get_snapped_center(drop_pos)
+	var snapped_pos = _get_safe_drop_position(get_snapped_center(drop_pos))
 	
 	NetworkManager.send_image_to_all(image_path, "token")
 	_local_spawn_token(image_path, 0.0, is_enemy, snapped_pos, unique_id)
@@ -781,7 +829,7 @@ func spawn_single_vault_token(pc_name: String, drop_pos: Vector2):
 		var v_data = CampaignManager.campaign_data["pc_vault"][pc_name]
 		var unique_id = "Token_" + str(Time.get_ticks_msec()) + "_" + str(randi() % 1000)
 		
-		var snapped_pos = get_snapped_center(drop_pos)
+		var snapped_pos = _get_safe_drop_position(get_snapped_center(drop_pos))
 		
 		# Beam the art to players, then spawn locally and remotely
 		NetworkManager.send_image_to_all(v_data["art_path"], "token")
@@ -955,7 +1003,7 @@ func receive_board_sync(scene_id: String, scene_data: Dictionary, quests_data: A
 	# MATCH SCENE DROPDOWN
 	var dropdown = gm_dashboard.scene_dropdown
 	for i in range(dropdown.get_item_count()):
-		if dropdown.get_item_text(i) == scene_id:
+		if dropdown.get_item_metadata(i) == scene_id:
 			dropdown.select(i)
 			break
 	

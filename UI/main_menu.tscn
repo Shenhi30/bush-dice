@@ -66,8 +66,29 @@ text = "Change Name"
 [node name="SettingsFeedbackLabel" type="Label" parent="CenterContainer/VBoxContainer" unique_id=168233937]
 layout_mode = 2
 
+[node name="Label" type="Label" parent="CenterContainer/VBoxContainer" unique_id=2049829437]
+layout_mode = 2
+text = "Press x - change token to enemy/neutral/ally
+Press + or - to change token size
+
+"
+
 [node name="LoadCampaignDialog" type="FileDialog" parent="." unique_id=192650964]
 title = "Open a File"
 file_mode = 0
 access = 2
 filters = PackedStringArray("*.json")
+
+[node name="Label" type="Label" parent="." unique_id=1645612379]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -40.0
+offset_top = -23.0
+grow_horizontal = 0
+grow_vertical = 0
+text = "version 0.16"
+horizontal_alignment = 1

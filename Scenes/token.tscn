@@ -223,6 +223,7 @@ offset_right = 86.5
 offset_bottom = 31.0
 min_value = -9999.0
 max_value = 9999.0
+alignment = 1
 prefix = "DMG/HP:"
 
 [node name="DamageBtn" type="Button" parent="UI/MenuLayer/TokenMenu/HPActionMenu" unique_id=673431039]
@@ -303,6 +304,7 @@ material = SubResource("CanvasItemMaterial_7ve0p")
 layout_mode = 0
 offset_right = 86.5
 offset_bottom = 31.0
+alignment = 1
 prefix = "Au:"
 
 [node name="AuraColorPicker" type="ColorPickerButton" parent="UI/MenuLayer/TokenMenu/AuraMenu" unique_id=1971407797]
@@ -344,6 +346,8 @@ material = SubResource("CanvasItemMaterial_7ve0p")
 layout_mode = 0
 offset_right = 86.5
 offset_bottom = 31.0
+max_value = 600.0
+alignment = 1
 
 [node name="ClearLightBtn" type="Button" parent="UI/MenuLayer/TokenMenu/LightMenu" unique_id=349961990]
 z_index = 1000

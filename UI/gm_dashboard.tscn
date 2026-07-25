@@ -171,9 +171,8 @@ text = "❌ Close"
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="MapGrid" type="GridContainer" parent="MapDrawer/VBoxContainer/ScrollContainer" unique_id=264260742]
+[node name="MapGrid" type="VBoxContainer" parent="MapDrawer/VBoxContainer/ScrollContainer" unique_id=1013905766]
 layout_mode = 2
-columns = 4
 
 [node name="TokenDrawer" type="PanelContainer" parent="." unique_id=1762281018]
 visible = false

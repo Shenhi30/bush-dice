@@ -1,58 +1,18 @@
 {
 	"active_scene_id": "map_1",
+	"backpacks": {},
 	"campaign_name": "New Campaign",
-	"quests": [],
+	"pc_vault": {},
+	"quests": [
+		{
+			"title": "Save Hagor"
+		}
+	],
 	"scenes": {
 		"map_1": {
-			"map_image_path": "res://Assets/Maps/120x130 vasen.jpg",
+			"map_image_path": "",
 			"map_scale": 1.0,
-			"tokens": [
-				{
-					"art_path": "",
-					"data": {
-						"ac": 10.0,
-						"current_init": 0.0,
-						"faction": "neutral",
-						"hp": 20.0,
-						"init_bonus": 2.0,
-						"is_dead": false,
-						"is_hiden": false,
-						"is_status_active": false,
-						"max_hp": 20.0,
-						"name": "Unknown",
-						"owner_id": 1.0,
-						"speed": 30.0,
-						"status_color": "c45500b2"
-					},
-					"height_offset": 0.0,
-					"name": "@CharacterBody2D@804",
-					"x": -33.6737060546875,
-					"y": 385.243408203125
-				},
-				{
-					"art_path": "res://Assets/Tokens/Laura.jpg",
-					"data": {
-						"ac": 10.0,
-						"current_init": 0.0,
-						"faction": "neutral",
-						"hp": 20.0,
-						"init_bonus": 2.0,
-						"is_dead": false,
-						"is_hiden": false,
-						"is_status_active": false,
-						"light_radius": 30.0,
-						"max_hp": 20.0,
-						"name": "Unknown",
-						"owner_id": "test1",
-						"speed": 30.0,
-						"status_color": "c45500b2"
-					},
-					"height_offset": 0.0,
-					"name": "Token_36238_678",
-					"x": 352.0,
-					"y": 352.0
-				}
-			],
+			"tokens": [],
 			"walls": []
 		}
 	}
