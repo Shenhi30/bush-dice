@@ -255,6 +255,11 @@ func generate_ui(template: Dictionary, character_data: Dictionary, token_name: S
 				for skill_name in item.get("skills", []):
 					var skill_id = skill_name.to_lower().replace(" ", "_")
 					
+					# --- THE SAFETY CHECK ---
+					# If this skill is in the token's blacklist, skip it completely!
+					if local_data.get("deleted_skills", []).has(skill_id):
+						continue
+
 					if item["type"] == "d100_skill_list":
 						var skill_row = HBoxContainer.new()
 						
@@ -276,6 +281,12 @@ func generate_ui(template: Dictionary, character_data: Dictionary, token_name: S
 						roll_btn.text = "🎲"
 						roll_btn.pressed.connect(func(): _on_roll_pressed(skill_id, skill_name))
 						skill_row.add_child(roll_btn)
+						
+						var del_btn = Button.new()
+						del_btn.text = "X"
+						del_btn.modulate = Color(0.9, 0.2, 0.2) # A nice danger red
+						del_btn.pressed.connect(func(): _delete_skill(skill_id, skill_row))
+						skill_row.add_child(del_btn)
 						
 						target_container.add_child(skill_row)
 						ui_nodes[skill_id] = skill_row
@@ -474,6 +485,26 @@ func _on_roll_pressed(item_id: String, roll_name: String):
 	var display_name = local_data.get("name", current_token_name)
 	var is_whisper = false
 	CampaignManager.fast_roll_requested.emit(display_name, roll_name, value_to_send, current_dice_logic, is_whisper)
+
+
+func _delete_skill(skill_id: String, row_node: Node):
+	# 1. Create the tracking array if it doesn't exist
+	if not local_data.has("deleted_skills"):
+		local_data["deleted_skills"] = []
+		
+	# 2. Add the skill to the blacklist so it never respawns
+	if not local_data["deleted_skills"].has(skill_id):
+		local_data["deleted_skills"].append(skill_id)
+		
+	# 3. Destroy the visual row
+	row_node.queue_free()
+	
+	# 4. Clean up the node tracker
+	if ui_nodes.has(skill_id):
+		ui_nodes.erase(skill_id)
+		
+	# 5. Tell the server we updated our sheet!
+	save_sheet_to_token()
 
 
 # --- POPUP HANDLING ---

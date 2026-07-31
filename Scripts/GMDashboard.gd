@@ -4,6 +4,7 @@ signal map_loaded(file_path: String)
 signal spawn_token_requested(image_path: String, y_offset: float, is_enemy_flag: bool)
 signal map_scale_changed(new_scale: float)
 signal tool_mode_changed(mode_index: int)
+signal measure_shape_changed(shape_index: int)
 signal save_requested(file_path: String)
 signal load_requested(file_path: String)
 signal scene_switched(new_scene_id: String)
@@ -34,6 +35,8 @@ signal spawn_party_requested
 @onready var system_dropdown = $ToolPallete/TabContainer/Tools/SystemDropdown
 
 @onready var party_list = $ToolPallete/TabContainer/Party/PartyList
+
+@onready var shape_dropdown = $ToolPallete/TabContainer/Tools/MeasureShapeDropdown
 # -- RENAME --
 @onready var rename_btn = $HBoxContainer/RenameSceneBtn
 @onready var rename_dialog = $RenameDialog
@@ -124,6 +127,8 @@ func _ready():
 	var tab_index = SheetTemplates.TEMPLATES.keys().find(active_system)
 	if tab_index != -1:
 		system_dropdown.select(tab_index)
+		
+	shape_dropdown.item_selected.connect(func(index): measure_shape_changed.emit(index))
 
 
 func _process(delta: float):
@@ -448,6 +453,7 @@ func _on_erase_wall_btn_toggled(toggled_on: bool) -> void:
 
 # 3 = MEASURE mode
 func _on_measure_tool_btn_toggled(toggled_on: bool) -> void:
+	shape_dropdown.visible = toggled_on
 	if toggled_on:
 		tool_mode_changed.emit(3)
 

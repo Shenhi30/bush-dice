@@ -2,8 +2,8 @@ extends Camera2D
 
 # Camera Settings
 var zoom_speed = 0.1
-var min_zoom = Vector2(0.2, 0.2)
-var max_zoom = Vector2(4.0, 4.0)
+var min_zoom = Vector2(0.00001, 0.00001)
+var max_zoom = Vector2(10.0, 10.0)
 var is_panning = false
 
 func _unhandled_input(event):

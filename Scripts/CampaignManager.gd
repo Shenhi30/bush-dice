@@ -3,7 +3,7 @@ extends Node
 var current_save_path: String = ""
 signal blueprint_updated
 # Updated signature to include dice_logic!
-signal fast_roll_requested(char_name: String, roll_name: String, modifier: int, dice_logic: String)
+signal fast_roll_requested(char_name: String, roll_name: String, modifier: int, dice_logic: String, is_whisper: bool)
 
 # --- NEW SIGNAL FOR EDITING STATS ON THE FLY ---
 signal token_data_edit_requested(token_name: String, key: String, new_value: Variant)

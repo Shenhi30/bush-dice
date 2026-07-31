@@ -94,6 +94,7 @@ const TEMPLATES = {
 			]}
 		]
 	},
+	
 	"shinobigami": {
 		"system_name": "Shinobigami",
 		"dice_logic": "2d6_high", # Shinobigami uses 2d6 >= Target Number
@@ -169,4 +170,74 @@ const TEMPLATES = {
 			]}
 		]
 	},
+	
+	
+	"Ark": {
+		"system_name": "Arknights 5e (AK5e)",
+		"dice_logic": "d20_high",
+		"layout": [
+			{
+				"tab": "Identity",
+				"elements": [
+					{"type": "image", "label": "Operator File Photo", "key": "portrait"},
+					{"type": "text", "label": "Codename", "key": "name"},
+					{"type": "text", "label": "Branch & Level", "key": "class"},
+					{"type": "long_text", "label": "Clinical Analysis & Background", "key": "backstory"}
+				]
+			},
+			{
+				"tab": "Core",
+				"elements": [
+					{"type": "stat_row", "stats": ["STR", "DEX", "CON", "INT", "WIS", "CHA"]},
+					{"type": "stat_box", "label": "Proficiency Bonus", "key": "prof_bonus"},
+					{"type": "stat_box", "label": "Initiative Bonus", "key": "init_bonus"},
+					{"type": "resource_bar", "label": "Hit Points", "max_key": "max_hp", "current_key": "hp"},
+					{"type": "resource_bar", "label": "Oripathy Assimilation", "max_key": "max_assimilation", "current_key": "assimilation_level"},
+					{"type": "stat_box", "label": "Armor Class", "key": "armor_class"},
+					{"type": "stat_box", "label": "Deployment Speed", "key": "speed"},
+					{"type": "death_saves", "label": "Death Saves", "success_key": "death_successes", "fail_key": "death_failures"}
+				]
+			},
+			{
+				"tab": "Saves & Skills",
+				"elements": [
+					{
+						"type": "skill_list",
+						"label": "Saving Throws",
+						"skills": [
+							"STR Save", "DEX Save", "CON Save", "INT Save", "WIS Save", "CHA Save"
+						]
+					},
+					{
+						"type": "skill_list",
+						"label": "Skills",
+						"skills": [
+							"Acrobatics", "Animal Handling", "Originium Arts (Arcana)", "Athletics", "Deception",
+							"History", "Insight", "Intimidation", "Investigation", "Medicine",
+							"Nature", "Perception", "Performance", "Persuasion", "Terra Lore (Religion)",
+							"Sleight of Hand", "Stealth", "Survival"
+						]
+					}
+				]
+			},
+			{
+				"tab": "Combat & Gear",
+				"elements": [
+					{"type": "long_text", "label": "Armaments & Arts", "key": "weapons_text"},
+					{"type": "long_text", "label": "Tactical Inventory", "key": "inventory_text"},
+					{"type": "stat_box", "label": "LMD (Lungmen Dollars)", "key": "lmd"},
+					{"type": "stat_box", "label": "Orundum", "key": "orundum"},
+					{"type": "stat_box", "label": "Suppressant Doses", "key": "suppressants"}
+				]
+			},
+			{
+				"tab": "Notes",
+				"elements": [
+					{"type": "long_text", "label": "Operator Talents & Features", "key": "features_text"},
+					{"type": "long_text", "label": "Archive Records", "key": "bio_text"}
+				]
+			}
+		]
+	}
+	
 }

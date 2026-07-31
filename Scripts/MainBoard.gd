@@ -4,6 +4,9 @@ extends Node2D
 enum Mode { SELECT, DRAW_WALL, ERASE_WALL, MEASURE }
 var current_mode: Mode = Mode.SELECT
 
+enum MeasureShape { LINE, CIRCLE, CONE }
+var current_measure_shape: MeasureShape = MeasureShape.LINE
+
 @onready var inv_window = $UILayer/InventoryWindow
 @onready var char_sheet_window = $UILayer/CharacterSheetWindow
 # --- PLAYER ROSTER VARIABLES ---
@@ -64,11 +67,11 @@ var measure_end_pos: Vector2 = Vector2.ZERO
 const TOKEN_SCENE = preload("res://Scenes/token.tscn")
 
 func _ready():
-	# --- NEW CHAT FIXES ---
+	# --- CHAT FIXES ---
 	chat_log.text = "" # Wipes the placeholder text
 	chat_log.scroll_following = true # Forces the chat to always scroll down
 	
-	# --- NEW SKILL EDIT SYNC ---
+	# --- SKILL EDIT SYNC ---
 	CampaignManager.token_data_edit_requested.connect(broadcast_token_data_update)
 
 	GameState.gm_mode_changed.connect(_on_gm_mode_changed)
@@ -82,6 +85,9 @@ func _ready():
 	gm_dashboard.load_requested.connect(_on_gm_dashboard_load_requested)
 	gm_dashboard.fog_bypass_toggled.connect(_on_fog_bypass_toggled)
 	gm_dashboard.spawn_party_requested.connect(_on_gm_dashboard_spawn_party_requested)
+	gm_dashboard.measure_shape_changed.connect(func(shape_index):
+		current_measure_shape = shape_index as MeasureShape
+	)
 	
 	
 	if not multiplayer.is_server():
@@ -309,15 +315,53 @@ func _on_token_layer_draw():
 		token_layer.draw_line(wall_start_pos, wall_end_pos, Color.RED, 4.0)
 		
 	if is_measuring:
-		token_layer.draw_line(measure_start_pos, measure_end_pos, Color(0.987, 0.536, 0.942, 0.7), 6.0)
-		var pixel_distance = measure_start_pos.distance_to(measure_end_pos)
 		var grid_size = 64.0
+		var raw_distance = measure_start_pos.distance_to(measure_end_pos)
+		
+		# --- THE 5-FOOT SNAP LOGIC ---
+		# Round the distance to the nearest grid square (64 pixels)
+		var pixel_distance = round(raw_distance / grid_size) * grid_size
+		
+		# Prevent a 0ft circle if you just clicked and dragged your mouse slightly
+		if pixel_distance < grid_size and raw_distance > 10.0:
+			pixel_distance = grid_size
+			
+		var fill_color = Color(0.987, 0.536, 0.942, 0.3) # Semi-transparent purple
+		var line_color = Color(0.987, 0.536, 0.942, 0.8) # Solid purple
+		
+		# --- DRAW THE SHAPES ---
+		if current_measure_shape == MeasureShape.LINE:
+			token_layer.draw_line(measure_start_pos, measure_end_pos, line_color, 6.0)
+			
+		elif current_measure_shape == MeasureShape.CIRCLE:
+			# The circle will now pop outward in exact 64-pixel (5ft) increments!
+			token_layer.draw_circle(measure_start_pos, pixel_distance, fill_color)
+			token_layer.draw_arc(measure_start_pos, pixel_distance, 0, TAU, 64, line_color, 4.0)
+			
+		elif current_measure_shape == MeasureShape.CONE:
+			# Standard 53.13 degree TTRPG cone geometry, also snapped to 5ft increments
+			var angle = measure_start_pos.angle_to_point(measure_end_pos)
+			var cone_angle = deg_to_rad(53.13) 
+			
+			var p1 = measure_start_pos + Vector2(cos(angle - cone_angle/2.0), sin(angle - cone_angle/2.0)) * pixel_distance
+			var p2 = measure_start_pos + Vector2(cos(angle + cone_angle/2.0), sin(angle + cone_angle/2.0)) * pixel_distance
+			
+			var points = PackedVector2Array([measure_start_pos, p1, p2])
+			token_layer.draw_polygon(points, PackedColorArray([fill_color, fill_color, fill_color]))
+			token_layer.draw_polyline(PackedVector2Array([measure_start_pos, p1, p2, measure_start_pos]), line_color, 4.0)
+
+		# --- DRAW THE DISTANCE TEXT ---
 		var feet_distance = (pixel_distance / grid_size) * 5.0
 		var distance_text = str(round(feet_distance)) + " ft."
-		var mid_point = (measure_start_pos + measure_end_pos) / 2.0
+		
+		var text_pos = measure_end_pos
+		if current_measure_shape == MeasureShape.LINE:
+			text_pos = (measure_start_pos + measure_end_pos) / 2.0
+			
 		var font = ThemeDB.fallback_font
-		token_layer.draw_string(font, mid_point + Vector2(2, 22), distance_text, HORIZONTAL_ALIGNMENT_CENTER, -1, 24, Color.BLACK)
-		token_layer.draw_string(font, mid_point + Vector2(0, 20), distance_text, HORIZONTAL_ALIGNMENT_CENTER, -1, 24, Color.WHITE)
+		token_layer.draw_string(font, text_pos + Vector2(2, 22), distance_text, HORIZONTAL_ALIGNMENT_CENTER, -1, 24, Color.BLACK)
+		token_layer.draw_string(font, text_pos + Vector2(0, 20), distance_text, HORIZONTAL_ALIGNMENT_CENTER, -1, 24, Color.WHITE)
+
 
 func _spawn_permanent_wall(start: Vector2, end: Vector2):
 	if start.distance_to(end) < 5.0: return
@@ -1264,7 +1308,7 @@ func open_character_sheet_for_token(token_name: String):
 # CHAT AND DICE LOG
 # ==========================================
 
-func _on_character_sheet_roll(char_name: String, roll_name: String, modifier: int, dice_logic: String = "d20_high") -> void:
+func _on_character_sheet_roll(char_name: String, roll_name: String, modifier: int, dice_logic: String = "d20_high", is_whisper: bool = false) -> void:
 	var result_text = ""
 	
 	# --- 1. D&D 5e MATH (1d20 + Modifier) ---
@@ -1311,9 +1355,10 @@ func _on_character_sheet_roll(char_name: String, roll_name: String, modifier: in
 	if my_name == "": my_name = "GM" if GameState.is_gm_mode else "Player"
 	var color = "#ffd700" if GameState.is_gm_mode else "#99ccff" 
 	
-	var actual_is_whisper = false
-	if whisper_check:
-		actual_is_whisper = whisper_check.button_pressed
+	# Combine the Character Sheet's whisper flag with the MainBoard's physical UI checkbox
+	var actual_is_whisper = is_whisper
+	if whisper_check and whisper_check.button_pressed:
+		actual_is_whisper = true
 	
 	if actual_is_whisper:
 		# Format a sneaky purple message for secrets!
