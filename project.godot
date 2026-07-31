@@ -15,7 +15,8 @@ config/description="VTT for non humans"
 config/version="0.20"
 run/main_scene="uid://x4os0solslq1"
 config/features=PackedStringArray("4.7", "Forward Plus")
-config/icon="res://icon.svg"
+config/icon="uid://cri0nqido0tvr"
+config/windows_native_icon="res://Bushdice.ico"
 
 [autoload]
 
