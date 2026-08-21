@@ -18,7 +18,7 @@ func _ready():
 	# 1. THE BOUNCER CHECK
 	# If someone tries to run the MainMenu scene directly without logging in, kick them back.
 	if not GameState.is_logged_in:
-		get_tree().change_scene_to_file("res://UI/AuthScreen.tscn")
+		get_tree().change_scene_to_file("res://Scenes/Auth_screen.tscn")
 		return
 
 	# 2. UI SETUP

@@ -42,6 +42,12 @@ signal spawn_party_requested
 @onready var rename_dialog = $RenameDialog
 @onready var rename_input = $RenameDialog/NewNameInput
 
+# --- TOOL BUTTONS ---
+# Double-check these paths exactly match the names of your buttons in the scene tree!
+@onready var btn_select = $ToolPallete/TabContainer/Tools/SelectToolBtn
+@onready var btn_draw = $ToolPallete/TabContainer/Tools/WallToolBtn
+@onready var btn_erase = $ToolPallete/TabContainer/Tools/EraseWallBtn
+@onready var btn_measure = $ToolPallete/TabContainer/Tools/MeasureToolBtn
 
 @onready var save_file_dialog = $SaveFileDialog
 @onready var load_file_dialog = $LoadFileDialog
@@ -408,6 +414,52 @@ func refresh_scene_dropdown():
 	if active_index != -1:
 		scene_dropdown.select(active_index)
 
+# ==========================================
+# TOOL COLOR MANAGER
+# ==========================================
+func update_tool_colors(active_mode: int):
+	var normal_color = Color(1.0, 1.0, 1.0, 1.0)
+	var active_color = Color(1.0, 0.84, 0.0, 1.0) # Bright Gold Highlight
+	
+	# 1. Reset all buttons to standard white
+	if btn_select: btn_select.modulate = normal_color
+	if btn_draw: btn_draw.modulate = normal_color
+	if btn_erase: btn_erase.modulate = normal_color
+	if btn_measure: btn_measure.modulate = normal_color
+	
+	# 2. Apply the gold highlight to the active tool
+	match active_mode:
+		0: # SELECT
+			if btn_select: 
+				btn_select.modulate = active_color
+				btn_select.set_pressed_no_signal(true) # Visually presses the toggle down!
+		1: # DRAW WALL
+			if btn_draw: 
+				btn_draw.modulate = active_color
+				btn_draw.set_pressed_no_signal(true)
+		2: # ERASE WALL
+			if btn_erase: 
+				btn_erase.modulate = active_color
+				btn_erase.set_pressed_no_signal(true)
+		3: # MEASURE
+			if btn_measure: 
+				btn_measure.modulate = active_color
+				btn_measure.set_pressed_no_signal(true)
+
+# --- KEYBOARD SHORTCUT RECEIVER ---
+func select_tool_by_index(mode_index: int):
+	# Setting button_pressed = true automatically triggers the _on_toggled signals!
+	match mode_index:
+		0: 
+			if btn_select: btn_select.button_pressed = true
+		1: 
+			if btn_draw: btn_draw.button_pressed = true
+		2: 
+			if btn_erase: btn_erase.button_pressed = true
+		3: 
+			if btn_measure: btn_measure.button_pressed = true
+
+
 # Connect the "pressed" signal from your Minus button to this
 func _on_scale_minus_btn_pressed() -> void:
 	# Nudge the scale down by 0.05 (adjust this step to your liking!)
@@ -440,22 +492,26 @@ func _on_scale_plus_btn_button_up():
 func _on_select_tool_btn_toggled(toggled_on: bool) -> void:
 	if toggled_on:
 		tool_mode_changed.emit(0)
+		update_tool_colors(0) # <--- Force the color update!
 
 # 1 = DRAW_WALL mode
 func _on_wall_tool_btn_toggled(toggled_on: bool) -> void:
 	if toggled_on:
 		tool_mode_changed.emit(1)
+		update_tool_colors(1)
 
 # 2 = ERASE mode
 func _on_erase_wall_btn_toggled(toggled_on: bool) -> void:
 	if toggled_on:
 		tool_mode_changed.emit(2) 
+		update_tool_colors(2)
 
 # 3 = MEASURE mode
 func _on_measure_tool_btn_toggled(toggled_on: bool) -> void:
 	shape_dropdown.visible = toggled_on
 	if toggled_on:
 		tool_mode_changed.emit(3)
+		update_tool_colors(3)
 
 func _on_scene_dropdown_selected(index: int):
 	var selected_scene_id = scene_dropdown.get_item_metadata(index)

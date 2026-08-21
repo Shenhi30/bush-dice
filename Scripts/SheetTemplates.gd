@@ -9,6 +9,7 @@ const TEMPLATES = {
 				{"type": "image", "label": "Appearance", "key": "portrait"},
 				{"type": "text", "label": "Character Name", "key": "name"},
 				{"type": "text", "label": "Class & Level", "key": "class"},
+				{"id": "owner_id", "type": "text", "label": "Assigned Player Name:"},
 				{"type": "long_text", "label": "Backstory", "key": "backstory"}
 			]},
 			
@@ -59,6 +60,7 @@ const TEMPLATES = {
 				{"type": "image", "label": "Appearance", "key": "portrait"},
 				{"type": "text", "label": "Character Name", "key": "name"},
 				{"type": "text", "label": "Class & Level", "key": "class"},
+				{"id": "owner_id", "type": "text", "label": "Assigned Player Name:"},
 				{"type": "long_text", "label": "Backstory", "key": "backstory"}
 			]},
 			
@@ -103,6 +105,7 @@ const TEMPLATES = {
 				{"type": "image", "label": "Appearance", "key": "portrait"},
 				{"type": "text", "label": "Character Name", "key": "name"},
 				{"type": "text", "label": "Class & Level", "key": "class"},
+				{"id": "owner_id", "type": "text", "label": "Assigned Player Name:"},
 				{"type": "long_text", "label": "Backstory", "key": "backstory"}
 			]},
 			
@@ -171,7 +174,6 @@ const TEMPLATES = {
 		]
 	},
 	
-	
 	"Ark": {
 		"system_name": "Arknights 5e (AK5e)",
 		"dice_logic": "d20_high",
@@ -182,6 +184,7 @@ const TEMPLATES = {
 					{"type": "image", "label": "Operator File Photo", "key": "portrait"},
 					{"type": "text", "label": "Codename", "key": "name"},
 					{"type": "text", "label": "Branch & Level", "key": "class"},
+					{"id": "owner_id", "type": "text", "label": "Assigned Player Name:"},
 					{"type": "long_text", "label": "Clinical Analysis & Background", "key": "backstory"}
 				]
 			},

@@ -39,7 +39,7 @@ fill_to = Vector2(0.5, 1)
 input_pickable = true
 script = ExtResource("1_w5to0")
 
-[node name="HightLightRing" type="ColorRect" parent="." unique_id=1123748571]
+[node name="HighLightRing" type="ColorRect" parent="." unique_id=1123748571]
 visible = false
 offset_left = -32.0
 offset_top = -32.0

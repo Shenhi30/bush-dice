@@ -54,7 +54,7 @@ func _ready():
 	if GameState.is_gm_mode:
 		add_stat_btn.show()
 	
-	generate_ui(CampaignManager.campaign_data["sheet_template"], {})
+	generate_ui(CampaignManager.campaign_data.get("sheet_template", {}), {})
 
 # --- DRAGGING LOGIC ---
 
@@ -364,7 +364,7 @@ func _on_skill_value_edited(skill_key: String, new_text: String) -> void:
 		save_sheet_to_token() # Auto-Save!
 
 func update_auto_math():
-	var template = CampaignManager.campaign_data["sheet_template"]
+	var template = CampaignManager.campaign_data.get("sheet_template", {})
 	var layout = template.get("layout", [])
 	
 	var prof_bonus = local_data.get("prof_bonus", 2) 

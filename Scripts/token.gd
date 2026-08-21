@@ -2,6 +2,7 @@ extends CharacterBody2D
 
 # --- STATS & STATE ---
 
+
 # The Token's "System-Agnostic Brain"
 var data: Dictionary = {
 	# --- IDENTITY ---
@@ -54,7 +55,7 @@ var drag_start_pos: Vector2 = Vector2.ZERO
 @onready var collision_shape = $CollisionShape2D
 @onready var vision_light = $VisionLight
 
-@onready var highlight_ring = $HightLightRing
+@onready var highlight_ring = $HighLightRing
 # --- MENU REFERENCES ---
 @onready var token_menu = $UI/MenuLayer/TokenMenu
 @onready var main_menu = $UI/MenuLayer/TokenMenu/MainMenu
@@ -129,16 +130,19 @@ func _ready():
 		label_y_offset = height_offset
 	
 	normalize_size()
-	input_event
+	
 	mouse_entered.connect(_on_mouse_entered)
 	mouse_exited.connect(_on_mouse_exited)
 	resize_handle.gui_input.connect(_on_resize_handle_input)
 	
 	
 	_setup_menu_signals()
+	
+	if data.has("light_radius"):
+		update_data("light_radius", data["light_radius"], true)
 
 func _process(_delta):
-	var my_uuid = GameState.user_id
+	var my_name = GameState.player_name # <--- THE FIX: Use our String Name!
 	var is_gm = GameState.is_gm_mode
 	
 	# 1. THE HIDE BUTTON LOGIC
@@ -148,22 +152,20 @@ func _process(_delta):
 		visible = true
 		
 	# 2. THE STATS & VISION LOGIC
-	var token_owner_id = str(data.get("owner_id", "1"))
+	var token_owner_id = str(data.get("owner_id", "GM"))
 	
 	# THE MAGIC HYBRID CHECK:
-	# If you are the GM, you have absolute power. 
-	# If you are a player, your name must match the owner string!
-	if is_gm or my_uuid == str(token_owner_id):
+	# If you are the GM, OR your exact name matches the owner string!
+	if is_gm or my_name == token_owner_id or token_owner_id == "GM" or token_owner_id == "1":
 		name_label.visible = true 
 		hp_bar.visible = true
-		vision_light.visible = true
+		vision_light.visible = true # <--- Turns on ONLY for the owner
 	else:
 		name_label.visible = false
 		hp_bar.visible = false
-		vision_light.visible = false
+		vision_light.visible = false # <--- Completely disabled for everyone else!
 		
 	# 3. GLUE THE MENU TO THE TOKEN
-	# We only do the math if the menus are actually open to save performance
 	if token_menu.visible:
 		token_menu.global_position = sprite.global_position
 		
@@ -171,41 +173,10 @@ func _process(_delta):
 		var extents = (sprite.texture.get_size() * sprite.scale) / 2.0
 		resize_handle.global_position = sprite.global_position + extents - (resize_handle.size / 2.0)
 
-# --- MOVEMENT (HYBRID DRAG + WASD) ---
-func _physics_process(_delta):
-	var is_moving = false
-
-	if dragging:
-		var target = get_global_mouse_position()
-		var distance = global_position.distance_to(target)
-		if distance > 5.0: 
-			velocity = global_position.direction_to(target) * distance * 15.0
-			move_and_slide()
-		is_moving = true
-
-	elif is_selected:
-		var input_dir = Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
-		if input_dir != Vector2.ZERO:
-			velocity = input_dir * move_speed
-			move_and_slide()
-			is_moving = true
-
-	if not is_moving and velocity != Vector2.ZERO:
-		velocity = Vector2.ZERO
-		snap_to_grid(global_position)
-
-func snap_to_grid(target_pos: Vector2 = global_position):
-	var current_x = target_pos.x - grid_offset.x
-	var current_y = target_pos.y - grid_offset.y
-	
-	var snapped_x = floor(current_x / base_cell_size) * base_cell_size
-	var snapped_y = floor(current_y / base_cell_size) * base_cell_size
-	
-	var center_offset = base_cell_size / 2.0
-	global_position = Vector2(snapped_x + center_offset, snapped_y + center_offset) + grid_offset
 
 # --- DATA MANAGEMENT ---
 func update_data(key: String, new_value, is_from_network: bool = false):
+	# --- CATCH THE CONTROLLER ASSIGNMENT ---
 	# Update or add the value to the dictionary
 	data[key] = new_value
 	
@@ -234,7 +205,7 @@ func update_data(key: String, new_value, is_from_network: bool = false):
 				var maximum_hp = data.get("max_hp", hp_bar.max_value)
 				hp_text.text = str(current_hp) + " / " + str(maximum_hp)
 
-	elif key == "faction" or key == "is_dead":
+	elif key == "faction" or key == "is_dead" or key == "is_hidden":
 		update_visuals()
 
 	elif key == "is_status_active" or key == "status_color":
@@ -258,15 +229,19 @@ func update_data(key: String, new_value, is_from_network: bool = false):
 
 # --- INPUT LOGIC ---
 func _on_input_event(_viewport, event, _shape_idx):
-	if event is InputEventMouseButton:
+	if event is InputEventMouseButton and event.pressed:
 		
-		# 1. LEFT CLICK DOWN: Start Dragging
-		if event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
-			dragging = true
-			drag_start_pos = global_position 
-
-		# 2. RIGHT CLICK DOWN: Open Menu (Only for the token you are touching!)
-		elif event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
+		# --- THE UNIFIED SECURITY BOUNCER ---
+		var my_name = GameState.player_name
+		var owner_name = str(data.get("owner_id", "GM"))
+		
+		if not GameState.is_gm_mode and owner_name != "GM" and owner_name != "1":
+			if my_name != owner_name:
+				print("Access Denied: This token belongs to ", owner_name)
+				return # STOP THE CODE! Do not allow menus to open!
+		
+		# 1. RIGHT CLICK DOWN: Open Menu (MainBoard now perfectly handles Left Clicks)
+		if event.button_index == MOUSE_BUTTON_RIGHT:
 			token_menu.visible = !token_menu.visible
 			if token_menu.visible:
 				main_menu.visible = true
@@ -281,24 +256,7 @@ func _on_input_event(_viewport, event, _shape_idx):
 				update_radial_menu()
 
 func _input(event):
-	# 1. GLOBAL LEFT CLICK UP: Stop Dragging
-	# (This MUST stay global so the token stops dragging even if your mouse moves off of it)
-	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
-		if not event.pressed and dragging:
-			dragging = false
-			
-			var was_quick_click = global_position.distance_to(drag_start_pos) < 10.0
-			
-			if was_quick_click:
-				is_selected = !is_selected
-				update_visuals()
-				snap_to_grid(global_position) 
-			else:
-				is_selected = true
-				update_visuals()
-				snap_to_grid(get_global_mouse_position()) 
-	
-	# 2. KEYBOARD HOTKEYS
+	# 1. KEYBOARD HOTKEYS (Movement dragging is now safely handled by MainBoard!)
 	if is_hovered and event is InputEventKey and event.pressed:
 		if event.keycode == KEY_EQUAL: 
 			grid_size_in_squares += 1
@@ -522,43 +480,27 @@ func _on_edit_btn_pressed():
 	_open_submenu(edit_menu, edit_btn, ring_2_items, ring_3_items)
 
 
-
 func _on_assign_owner_pressed():
 	var typed_name = owner_input.text.strip_edges()
 	
 	if typed_name == "" or typed_name.to_upper() == "GM":
-		update_data("owner_id", "1") # "1" is our safe default for the GM
+		update_data("owner_id", "GM") 
 		print("Assigned ownership back to GM")
 	else:
-		# Ask the game to find this player's UUID
-		var target_uuid = _get_uuid_from_name(typed_name)
-		
-		if target_uuid != "":
-			update_data("owner_id", target_uuid)
-			print("Token assigned to " + typed_name + " (UUID: " + target_uuid.substr(0, 8) + "...)")
-			
-			# Broadcast the UUID to the network, not the name!
-			var main_board = get_node_or_null("../../")
-			if main_board and main_board.has_method("broadcast_token_owner"):
-				main_board.broadcast_token_owner(name, target_uuid)
-		else:
-			print("ERROR: Could not find a connected player named: ", typed_name)
-			# Optional: Change the input text to red to warn the GM
+		# Just save the exact name they typed!
+		update_data("owner_id", typed_name)
+		print("Token assigned to ", typed_name)
 			
 	token_menu.hide()
 
 func _on_hide_btn_pressed():
 	# Flip the boolean! If it was false, make it true.
 	var new_hidden_state = !data.get("is_hidden", false)
-	update_data("is_hidden", new_hidden_state)
 	
-	# Tell the MainBoard to broadcast this secret across the internet!
-	var main_board = get_node_or_null("../../")
-	if main_board and main_board.has_method("broadcast_token_hidden_state"):
-		main_board.broadcast_token_hidden_state(name, new_hidden_state)
-		
+	# This automatically triggers the network sync!
+	update_data("is_hidden", new_hidden_state) 
+	
 	token_menu.hide()
-	update_visuals()
 
 func _on_delete_btn_pressed():
 	token_menu.hide()
@@ -701,7 +643,7 @@ func update_ui_positions():
 func set_selected(is_selected: bool):
 	highlight_ring.visible = is_selected
 
-# --- NEW IMAGE LOADING FUNCTION ---
+# --- IMAGE LOADING FUNCTION ---
 func load_token_image():
 	if art_path == "": return
 	
@@ -721,18 +663,3 @@ func load_token_image():
 		normalize_size() # Ensure it scales correctly once loaded
 	else:
 		print("Waiting for token image to finish downloading...")
-
-func _get_uuid_from_name(target_name: String) -> String:
-	# If you are testing locally and typing your own name
-	if target_name == GameState.player_name:
-		return GameState.user_id
-		
-	# IDEAL SETUP: Your NetworkManager keeps a dictionary of connected players
-	# Example: NetworkManager.connected_players = { 1: {"name": "Shenhi", "uuid": "58ee..."} }
-	if NetworkManager and "connected_players" in NetworkManager:
-		for peer_id in NetworkManager.players:
-			var player_data = NetworkManager.players[peer_id]
-			if player_data.get("name") == target_name:
-				return player_data.get("uuid", "")
-				
-	return "" # Return empty if the player isn't found

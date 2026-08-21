@@ -1,19 +1,56 @@
 {
-	"active_scene_id": "map_1",
+	"active_scene_id": "default_map",
 	"backpacks": {},
 	"campaign_name": "New Campaign",
-	"pc_vault": {},
-	"quests": [
-		{
-			"title": "Save Hagor"
+	"pc_vault": {
+		"Unknown": {
+			"art_path": "user://tokens/6662c45a04d674e152f8da8a-removebg-preview.png",
+			"data": {
+				"current_init": 0.0,
+				"faction": "neutral",
+				"hp": 20.0,
+				"is_dead": false,
+				"is_hidden": false,
+				"is_status_active": false,
+				"light_radius": 40.0,
+				"max_hp": 20.0,
+				"name": "Unknown",
+				"owner_id": "1",
+				"status_color": "c45500b2"
+			},
+			"height_offset": 0.0
 		}
-	],
+	},
+	"quests": [],
 	"scenes": {
-		"map_1": {
-			"map_image_path": "",
+		"default_map": {
+			"map_image_path": "user://maps/Encounters/VAMPIRE BATTLE.jpeg",
 			"map_scale": 1.0,
-			"tokens": [],
+			"tokens": [
+				{
+					"art_path": "user://tokens/6662c45a04d674e152f8da8a-removebg-preview.png",
+					"data": {
+						"current_init": 0.0,
+						"faction": "neutral",
+						"hp": 20.0,
+						"is_dead": false,
+						"is_hidden": false,
+						"is_status_active": false,
+						"light_radius": 40.0,
+						"max_hp": 20.0,
+						"name": "Unknown",
+						"owner_id": "1",
+						"status_color": "c45500b2"
+					},
+					"height_offset": 0.0,
+					"name": "Token_18901_515",
+					"x": 864.0,
+					"y": 416.0
+				}
+			],
 			"walls": []
 		}
-	}
+	},
+	"sheet_template": {},
+	"system_id": "dnd_5e"
 }

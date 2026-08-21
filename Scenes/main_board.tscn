@@ -209,9 +209,9 @@ anchor_left = 0.5
 anchor_top = 1.0
 anchor_right = 0.5
 anchor_bottom = 1.0
-offset_left = -500.0
+offset_left = -465.0
 offset_top = -40.0
-offset_right = -177.0
+offset_right = -142.0
 grow_horizontal = 2
 grow_vertical = 0
 mouse_filter = 1
@@ -226,6 +226,16 @@ offset_bottom = 541.0
 
 [node name="CharacterSheetWindow" parent="UILayer" unique_id=1768750079 instance=ExtResource("8_cvtiy")]
 visible = false
+
+[node name="BackToMenuBtn" type="Button" parent="UILayer" unique_id=205959314]
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_top = -40.0
+offset_right = 111.0
+grow_vertical = 0
+text = "Back to menu"
+flat = true
 
 [node name="BackgroundDropLayer" type="CanvasLayer" parent="." unique_id=471475110]
 layer = 9

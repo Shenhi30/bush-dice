@@ -64,6 +64,8 @@ var measure_end_pos: Vector2 = Vector2.ZERO
 @onready var roll_init_btn = $UILayer/TabContainer/InitiativeTracker/MarginContainer/VBoxContainer/RollInitBtn
 @onready var reset_init_btn = $UILayer/TabContainer/InitiativeTracker/MarginContainer/VBoxContainer/ResetInitBtn
 
+@onready var back_menu_btn = $UILayer/BackToMenuBtn
+
 const TOKEN_SCENE = preload("res://Scenes/token.tscn")
 
 func _ready():
@@ -89,7 +91,6 @@ func _ready():
 		current_measure_shape = shape_index as MeasureShape
 	)
 	
-	
 	if not multiplayer.is_server():
 		rpc_id(1, "request_board_sync")
 		
@@ -112,6 +113,9 @@ func _ready():
 			print("Game Auto-Saved!")
 	)
 	add_child(autosave_timer)
+	
+	if back_menu_btn:
+		back_menu_btn.pressed.connect(_on_back_menu_pressed)
 	
 	# --- PLAYER ROSTER SETUP ---
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
@@ -164,6 +168,17 @@ func _get_token_under_mouse(mouse_pos: Vector2):
 	return null
 
 func _unhandled_input(event):
+	# --- TOOL SHORTCUTS (1, 2, 3, 4) ---
+	if event is InputEventKey and event.pressed and not event.is_echo():
+		if event.keycode == KEY_1:
+			_change_tool_shortcut(Mode.SELECT)
+		elif event.keycode == KEY_2 and GameState.is_gm_mode:
+			_change_tool_shortcut(Mode.DRAW_WALL)
+		elif event.keycode == KEY_3 and GameState.is_gm_mode:
+			_change_tool_shortcut(Mode.ERASE_WALL)
+		elif event.keycode == KEY_4:
+			_change_tool_shortcut(Mode.MEASURE)
+	
 	if current_mode == Mode.SELECT:
 		# WASD MOVEMENT
 		if event is InputEventKey and event.pressed and not event.is_echo():
@@ -289,6 +304,12 @@ func _unhandled_input(event):
 		elif event is InputEventMouseMotion and is_measuring:
 			measure_end_pos = get_snapped_center(get_global_mouse_position())
 			token_layer.queue_redraw()
+
+func _change_tool_shortcut(new_mode: int):
+	# Don't try to change the tool manually here. 
+	# Just tell the dashboard to press the button, and let the dashboard handle the rest naturally!
+	if gm_dashboard and gm_dashboard.has_method("select_tool_by_index"):
+		gm_dashboard.select_tool_by_index(new_mode)
 
 func _clear_selection():
 	for token in selected_tokens:
@@ -443,6 +464,19 @@ func _populate_initiative_ui(sorted_tokens: Array):
 		row.add_child(score_label)
 		token_list.add_child(row)
 
+func _on_back_menu_pressed():
+	# 1. Force a final auto-save if you are the Host
+	if multiplayer.is_server() and CampaignManager.current_save_path != "":
+		_on_gm_dashboard_save_requested(CampaignManager.current_save_path)
+		
+	# 2. Safely close the network connection so ports don't get stuck
+	if multiplayer.has_multiplayer_peer():
+		multiplayer.multiplayer_peer.close()
+		
+	# 3. Change to your Main Menu scene! 
+	# (Update this string to the exact path of your Main Menu scene)
+	get_tree().change_scene_to_file("res://UI/main_menu.tscn")
+
 func _on_gm_mode_changed(is_gm: bool):
 	# 1. Show the GM their secret tools
 	gm_layer.visible = is_gm
@@ -505,6 +539,8 @@ func _on_gm_dashboard_spawn_token_requested(image_path: String, y_offset: float,
 	
 	_local_spawn_token(image_path, y_offset, is_enemy_flag, $GMCamera.global_position, unique_id)
 	
+	# Give the image 0.5 seconds to transfer before telling the clients to spawn it!
+	await get_tree().create_timer(0.5).timeout
 	rpc("receive_spawn_token", image_path, y_offset, is_enemy_flag, $GMCamera.global_position, unique_id)
 
 func _local_spawn_token(img: String, offset: float, is_enemy: bool, pos: Vector2, token_id: String):
@@ -545,7 +581,14 @@ func _on_gm_dashboard_map_loaded(file_path: String):
 func _on_gm_dashboard_tool_mode_changed(mode_index: int) -> void:
 	current_mode = mode_index as Mode
 	is_drawing_wall = false
+	
+	_clear_selection()
+	is_dragging_tokens = false
+	is_drawing_box = false
+	
 	queue_redraw()
+	if token_layer:
+		token_layer.queue_redraw()
 
 func _get_wall_under_mouse(mouse_pos: Vector2) -> Node2D:
 	var best_wall = null
@@ -677,7 +720,7 @@ func _on_gm_dashboard_load_requested(path: String):
 		CampaignManager.campaign_data["backpacks"] = {}
 	if not CampaignManager.campaign_data.has("pc_vault"):
 		CampaignManager.campaign_data["pc_vault"] = {}
-	
+		
 	gm_dashboard.refresh_scene_dropdown()
 		
 	for token in token_layer.get_children(): token.queue_free()
@@ -710,6 +753,11 @@ func _on_gm_dashboard_load_requested(path: String):
 	if CampaignManager.campaign_data.has("quests"):
 		quest_tracker.quests = CampaignManager.campaign_data["quests"]
 		quest_tracker._update_ui()
+		
+	# Sync the loaded fog state to the players
+	if CampaignManager.campaign_data.has("fog"):
+		rpc("receive_fog_update", CampaignManager.campaign_data["fog"])
+		
 	# If we are the GM, tell all currently connected players to reload their boards!
 	if multiplayer.is_server():
 		var global_quests = CampaignManager.campaign_data.get("quests", [])
@@ -836,6 +884,9 @@ func spawn_entire_party(drop_pos: Vector2):
 		
 		# Spawn locally, then tell the network
 		_local_spawn_vault_token(v_data, drop_pos + Vector2(offset_x, 0), unique_id)
+		
+		# Give image time to load
+		await get_tree().create_timer(0.5).timeout
 		rpc("receive_spawn_vault_token", v_data, drop_pos + Vector2(offset_x, 0), unique_id)
 		offset_x += 80 # Space them out so they don't stack on top of each other
 
@@ -861,6 +912,9 @@ func spawn_dropped_token(image_path: String, is_enemy: bool, drop_pos: Vector2):
 	
 	NetworkManager.send_image_to_all(image_path, "token")
 	_local_spawn_token(image_path, 0.0, is_enemy, snapped_pos, unique_id)
+	
+	# Give the image 0.5 seconds to transfer!
+	await get_tree().create_timer(0.5).timeout
 	rpc("receive_spawn_token", image_path, 0.0, is_enemy, snapped_pos, unique_id)
 
 # 2. Spawning a Specific Vault Player
@@ -880,12 +934,28 @@ func spawn_single_vault_token(pc_name: String, drop_pos: Vector2):
 		
 		# Notice we use the _local_spawn_vault_token function here so it injects their saved brain!
 		_local_spawn_vault_token(v_data, snapped_pos, unique_id)
+		
+		# Give the image 0.5 seconds to transfer!
+		await get_tree().create_timer(0.5).timeout
 		rpc("receive_spawn_vault_token", v_data, snapped_pos, unique_id)
 		
 
 # ==========================================
 # MULTIPLAYER SYNCING
 # ==========================================
+
+# ==========================================
+# FOG SYNCING
+# ==========================================
+@rpc("authority", "call_remote", "reliable")
+func receive_fog_update(new_fog_data: Variant) -> void:
+	# Save it to the central brain so it persists on save/load
+	CampaignManager.campaign_data["fog"] = new_fog_data
+	
+	# Force the local fog layer to redraw itself using the new data!
+	# (Replace 'fog_layer' and 'update_fog' with your actual node name and drawing function)
+	if has_node("FogLayer"):
+		$FogLayer.update_fog(new_fog_data)
 
 # ==========================================
 # PLAYER ROSTER SYNCING
@@ -1000,14 +1070,30 @@ func _toggle_player_role(target_id: int):
 		_update_player_list_ui()
 		rpc("sync_roster_to_players", connected_players)
 
+
 func sync_token_move(token_name: String, new_pos: Vector2):
-	rpc("receive_token_move", token_name, new_pos)
+	if multiplayer.is_server():
+		rpc("receive_token_move", token_name, new_pos)
+	else:
+		rpc_id(1, "request_token_move", token_name, new_pos)
 
 @rpc("any_peer", "call_remote", "unreliable")
+func request_token_move(token_name: String, new_pos: Vector2):
+	if multiplayer.is_server():
+		var sender_id = multiplayer.get_remote_sender_id()
+		receive_token_move(token_name, new_pos) # Move it for the GM
+		
+		# Bounce to everyone else EXCEPT the person who just moved it!
+		for peer_id in connected_players.keys():
+			if peer_id != 1 and peer_id != sender_id:
+				rpc_id(peer_id, "receive_token_move", token_name, new_pos)
+
+@rpc("authority", "call_remote", "unreliable")
 func receive_token_move(token_name: String, new_pos: Vector2):
 	var target_token = token_layer.get_node_or_null(token_name)
 	if target_token:
 		target_token.global_position = new_pos
+
 
 @rpc("any_peer", "call_remote", "reliable")
 func request_board_sync():
@@ -1141,13 +1227,45 @@ func request_token_data_update(token_name: String, key: String, new_value: Varia
 func receive_token_data_update(token_name: String, key: String, new_value: Variant):
 	# Find the token by its unique barcode and update its brain!
 	var target_token = token_layer.get_node_or_null(token_name)
+	
+	# 1. Update the visual token on the board
 	if target_token and target_token.has_method("update_data"):
 		# We pass "true" so the token knows this came from the internet, preventing infinite loops!
 		target_token.update_data(key, new_value, true)
 		
-		# ---  GM Auto-Sort Hook for PLAYER changes ---
 		if key in ["current_init", "init_bonus", "initiative"] and multiplayer.is_server():
 			_refresh_and_sync_initiative()
+			
+	# 2. Live-sync the Character Sheet UI if it's currently open
+	if char_sheet_window.visible and char_sheet_window.current_token_name == token_name:
+		char_sheet_window.local_data[key] = new_value
+		char_sheet_window._on_blueprint_updated() 
+		
+	# --- 3. THE PERSISTENT SAVE ENGINE (SERVER ONLY) ---
+	if multiplayer.is_server():
+		# A. Save it to the Active Scene so the map remembers it
+		var current_scene_id = CampaignManager.campaign_data.get("active_scene_id", "")
+		if current_scene_id != "" and CampaignManager.campaign_data["scenes"].has(current_scene_id):
+			var scene_tokens = CampaignManager.campaign_data["scenes"][current_scene_id].get("tokens", [])
+			for i in range(scene_tokens.size()):
+				if scene_tokens[i].get("name") == token_name:
+					if not scene_tokens[i].has("data"): scene_tokens[i]["data"] = {}
+					scene_tokens[i]["data"][key] = new_value
+					break
+				
+		# B. If this token belongs to a Player, save it to the Global PC Vault!
+		if target_token:
+			var pc_name = target_token.name
+			if target_token.get("data") and target_token.data.has("name"):
+				pc_name = target_token.data["name"]
+				
+			if CampaignManager.campaign_data.has("pc_vault"):
+				for vault_pc_key in CampaignManager.campaign_data["pc_vault"].keys():
+					if vault_pc_key == pc_name or vault_pc_key in token_name:
+						CampaignManager.campaign_data["pc_vault"][vault_pc_key]["data"][key] = new_value
+						print("Saved " + key + " to Global PC Vault for: " + vault_pc_key)
+
+
 
 # ==========================================
 # TOKEN OWNERSHIP & HIDING
@@ -1181,18 +1299,7 @@ func receive_token_delete(token_name: String):
 			
 		token.queue_free()
 
-
-func broadcast_token_hidden_state(token_name: String, is_hidden: bool):
-	if multiplayer.is_server():
-		rpc("receive_token_hidden_state", token_name, is_hidden)
-
 @rpc("authority", "call_remote", "reliable")
-func receive_token_hidden_state(token_name: String, is_hidden: bool):
-	var token = token_layer.get_node_or_null(token_name)
-	if token and token.has_method("update_data"):
-		token.update_data("is_hidden", is_hidden)
-		token.update_visuals()
-
 func broadcast_token_owner(token_name: String, new_owner_name: String): # Changed to String
 	if multiplayer.is_server():
 		rpc("receive_token_owner", token_name, new_owner_name)
@@ -1367,13 +1474,19 @@ func _on_character_sheet_roll(char_name: String, roll_name: String, modifier: in
 		# 1. Print locally so the roller sees their own secret roll
 		receive_chat_message(my_name, secret_msg, color)
 		
-		# 2. If the roller is NOT the GM, beam it specifically to the GM (Host ID 1)
+		# 2. If the roller is NOT the GM, safely beam it to the GM's whisper receiver
 		if not multiplayer.is_server():
-			rpc_id(1, "receive_chat_message", my_name, secret_msg, color)
+			rpc_id(1, "receive_whisper", secret_msg)
 			
 	else:
-		# Public Roll!
-		rpc("receive_chat_message", my_name, "\n" + result_text, color)
+		# --- THE FIX: ROUTE PUBLIC ROLLS THROUGH THE REQUEST PIPELINE ---
+		var final_text = "\n" + result_text
+		if multiplayer.is_server():
+			receive_chat_message(my_name, final_text, color)
+			rpc("receive_chat_message", my_name, final_text, color)
+		else:
+			# Ask the GM to broadcast our roll for us!
+			rpc_id(1, "request_chat_message", my_name, final_text, color)
 	
 
 func _on_chat_send_pressed():
@@ -1381,25 +1494,30 @@ func _on_chat_send_pressed():
 	if text == "": return
 	
 	var my_name = GameState.player_name
-	var color = "#ffd700" if GameState.is_gm_mode else "#99ccff" # Gold for GM, Blue for Player
+	var color = "#ffd700" if GameState.is_gm_mode else "#99ccff"
 	
-	# Broadcast to everyone (and ourselves!)
-	rpc("receive_chat_message", my_name, text, color)
+	if multiplayer.is_server():
+		receive_chat_message(my_name, text, color)
+		rpc("receive_chat_message", my_name, text, color)
+	else:
+		# Ask the GM to broadcast it for us!
+		rpc_id(1, "request_chat_message", my_name, text, color)
+		
 	chat_input.text = ""
 
-@rpc("any_peer", "call_local" ,"reliable")
+@rpc("any_peer", "call_remote", "reliable")
+func request_chat_message(sender_name: String, text: String, color_hex: String):
+	if multiplayer.is_server():
+		receive_chat_message(sender_name, text, color_hex) # Print on GM screen
+		rpc("receive_chat_message", sender_name, text, color_hex) # Bounce to players
+
+@rpc("authority", "call_remote", "reliable")
 func receive_chat_message(sender_name: String, text: String, color_hex: String):
-	# 1. Format the message
 	var formatted_msg = "[color=%s][b]%s:[/b][/color] %s\n\n" % [color_hex, sender_name, text]
-	
-	print("Attempting to add to chat: ", formatted_msg)
-	# 2. Add the text
 	chat_log.append_text(formatted_msg)
-	
-	# 3. FORCE SCROLL: This calculates the total lines and jumps to the end
-	# We call this on the next frame to ensure the label has finished calculating the new text height
 	await get_tree().process_frame 
 	chat_log.scroll_to_line(chat_log.get_line_count() - 1)
+
 
 # For secret rolls, we only send the text directly to the Host (ID 1)
 @rpc("any_peer", "call_remote", "reliable")
