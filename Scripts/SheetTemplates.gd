@@ -48,7 +48,17 @@ const TEMPLATES = {
 			{"tab": "Notes", "elements": [
 				{"type": "long_text", "label": "Features & Traits", "key": "features_text"},
 				{"type": "long_text", "label": "Biography", "key": "bio_text"}
-			]}
+			]},
+			
+			{
+				"tab": "Spells",
+				"elements": [
+					{
+						"type": "spell_book",
+						"max_level": 15 # Якщо хочете 10+, просто змініть на 10!
+					}
+				]
+			}
 		]
 	},
 	
@@ -238,6 +248,15 @@ const TEMPLATES = {
 				"elements": [
 					{"type": "long_text", "label": "Operator Talents & Features", "key": "features_text"},
 					{"type": "long_text", "label": "Archive Records", "key": "bio_text"}
+				]
+			},
+			{
+				"tab": "Spells",
+				"elements": [
+					{
+						"type": "spell_book",
+						"max_level": 20 # Якщо хочете 10+, просто змініть на 10!
+					}
 				]
 			}
 		]

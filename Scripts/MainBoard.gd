@@ -13,6 +13,7 @@ var current_measure_shape: MeasureShape = MeasureShape.LINE
 @onready var player_container = $UILayer/TabContainer/PlayerListPanel/PlayerContainer
 var connected_players: Dictionary = {} # Stores ID -> {name, role}
 
+
 # --- QUEST DATA ---
 var quests: Array = []
 var current_map_path: String = ""
@@ -30,6 +31,8 @@ var is_loading_game: bool = false
 @onready var chat_input = $UILayer/TabContainer/ChatPanel/VBoxContainer/HBoxContainer/ChatInput
 @onready var chat_send_btn = $UILayer/TabContainer/ChatPanel/VBoxContainer/HBoxContainer/SendBtn
 
+# --- TURN MANAGEMENT ---
+var current_turn_index: int = 0
 
 var currently_viewed_backpack_uuid = ""
 
@@ -50,6 +53,13 @@ var wall_end_pos: Vector2 = Vector2.ZERO
 var is_measuring: bool = false
 var measure_start_pos: Vector2 = Vector2.ZERO
 var measure_end_pos: Vector2 = Vector2.ZERO
+var network_measurements: Dictionary = {}
+var player_toolbar: PanelContainer
+
+# --- AoE DAMAGE ---
+var aoe_dialog: ConfirmationDialog
+var aoe_input: SpinBox
+
 
 # --- DICE ROLLER NODES ---
 @onready var dice_count_box = $UILayer/DiceRollPanel/HBoxContainer/CountBox
@@ -63,6 +73,7 @@ var measure_end_pos: Vector2 = Vector2.ZERO
 @onready var token_list = $UILayer/TabContainer/InitiativeTracker/MarginContainer/VBoxContainer/TokenList
 @onready var roll_init_btn = $UILayer/TabContainer/InitiativeTracker/MarginContainer/VBoxContainer/RollInitBtn
 @onready var reset_init_btn = $UILayer/TabContainer/InitiativeTracker/MarginContainer/VBoxContainer/ResetInitBtn
+@onready var next_turn_btn = $UILayer/TabContainer/InitiativeTracker/MarginContainer/VBoxContainer/NextTurn
 
 @onready var back_menu_btn = $UILayer/BackToMenuBtn
 
@@ -91,6 +102,8 @@ func _ready():
 		current_measure_shape = shape_index as MeasureShape
 	)
 	
+	gm_dashboard.map_scale_changed.connect(_on_dashboard_map_scale_changed)
+	
 	if not multiplayer.is_server():
 		rpc_id(1, "request_board_sync")
 		
@@ -117,6 +130,9 @@ func _ready():
 	if back_menu_btn:
 		back_menu_btn.pressed.connect(_on_back_menu_pressed)
 	
+	if next_turn_btn:
+		next_turn_btn.pressed.connect(advance_turn)
+	
 	# --- PLAYER ROSTER SETUP ---
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 	
@@ -129,19 +145,27 @@ func _ready():
 	else:
 		GameState.is_gm_mode = (my_id == 1)
 	
-	# Grab the name we saved from the Main Menu!
+	# Grab the name and UUID we saved from the Supabase Auth / Main Menu!
 	var my_name = GameState.player_name
+	
+	# Safe fetch for an Object instead of a Dictionary
+	var my_uuid = GameState.get("player_uuid")
+	if my_uuid == null:
+		my_uuid = ""
 	
 	# Fallback: Just in case they left the box blank
 	if my_name == "":
 		my_name = "GM" if my_id == 1 else "Player_" + str(my_id).left(4)
 		
-	connected_players[my_id] = {"name": my_name, "role": my_role}
+	# Save BOTH the name and the UUID locally
+	connected_players[my_id] = {"name": my_name, "role": my_role, "uuid": my_uuid}
 	_update_player_list_ui()
 	
 	if not multiplayer.is_server():
-		rpc_id(1, "register_player_with_gm", my_name)
+		# Send the UUID along with the name to the GM!
+		rpc_id(1, "register_player_with_gm", my_name, my_uuid)
 		
+	_setup_player_toolbar()
 	# This forces the darkness, the GM dashboard, and the GM layer 
 	# to perfectly match who you are the exact second the map finishes loading.
 	_on_gm_mode_changed(GameState.is_gm_mode)
@@ -158,6 +182,9 @@ func _ready():
 	if CampaignManager.current_save_path != "":
 		# We must defer the call until the end of the frame so all UI nodes are fully ready
 		call_deferred("_on_gm_dashboard_load_requested", CampaignManager.current_save_path)
+		
+	_setup_aoe_dialog()
+
 
 func _get_token_under_mouse(mouse_pos: Vector2):
 	var tokens = token_layer.get_children()
@@ -198,7 +225,51 @@ func _unhandled_input(event):
 							token.move_and_collide(move_dir * grid_size)  # Players hit walls!
 							
 						sync_token_move(token.name, token.global_position)
-		
+		# --- BULK HOTKEYS (H & DELETE & Q) ---
+		if event is InputEventKey and event.pressed and not event.is_echo() and GameState.is_gm_mode:
+			if event.keycode == KEY_H:
+				if selected_tokens.is_empty(): return
+				
+				# Check the first token to decide whether to hide or reveal the whole group
+				var target_hidden = not selected_tokens[0].data.get("is_hidden", false)
+				for token in selected_tokens:
+					if is_instance_valid(token):
+						token.data["is_hidden"] = target_hidden
+						broadcast_token_data_update(token.name, "is_hidden", target_hidden)
+						token.modulate = Color(1.5, 1.5, 1.5, 0.4) if target_hidden else Color(1.5, 1.5, 1.5, 1.0)
+						
+			elif event.keycode == KEY_DELETE: 
+				# .duplicate() prevents the loop from skipping items as they are deleted!
+				for token in selected_tokens.duplicate():
+					if is_instance_valid(token):
+						delete_token_networked(token.name)
+				selected_tokens.clear()
+				
+			elif event.keycode == KEY_Q:
+				if selected_tokens.is_empty(): return
+				
+				# Pop open the dynamic window and put the mouse cursor inside the number box
+				aoe_dialog.popup_centered()
+				aoe_input.grab_focus()
+		# Press 'N' to force the turn to advance
+		if event is InputEventKey and event.pressed and not event.is_echo():
+			if event.keycode == KEY_N:
+				advance_turn()
+
+		# --- PING THE MAP (Alt + Left Click) ---
+		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+			if Input.is_key_pressed(KEY_ALT):
+				var pos = get_global_mouse_position()
+				var hex = "#ffd700" if GameState.is_gm_mode else GameState.player_color_hex
+			
+				# Beam the ping to everyone, and draw it locally too!
+				rpc("receive_ping", pos, hex)
+				receive_ping(pos, hex)
+			
+				# Stop the click from accidentally selecting a token underneath the mouse
+				get_viewport().set_input_as_handled() 
+				return
+
 		# MOUSE CLICKS
 		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 			if event.pressed:
@@ -212,12 +283,19 @@ func _unhandled_input(event):
 						print("You do not have permission to touch this token!")
 						return
 						
-					if not clicked_token in selected_tokens:
+					# --- FIXED: SHIFT-CLICK LOGIC ADDED HERE ---
+					var is_holding_shift = Input.is_key_pressed(KEY_SHIFT)
+					
+					if not is_holding_shift and not clicked_token in selected_tokens:
 						_clear_selection()
+						
+					if not clicked_token in selected_tokens:
 						selected_tokens.append(clicked_token)
 						if clicked_token.has_method("set_selected"):
 							clicked_token.set_selected(true)
 							
+						clicked_token.modulate = Color(1.5, 1.5, 1.5) # Glow!
+						
 					is_dragging_tokens = true
 					last_mouse_pos = get_global_mouse_position()
 				else:
@@ -233,10 +311,8 @@ func _unhandled_input(event):
 					is_dragging_tokens = false
 					for token in selected_tokens:
 						if GameState.is_gm_mode:
-							# GM snaps perfectly
 							token.global_position = get_snapped_center(token.global_position)
 						else:
-							# Calculate the snap distance, but use PHYSICS to travel there!
 							var target_snap = get_snapped_center(token.global_position)
 							var snap_offset = target_snap - token.global_position
 							token.move_and_collide(snap_offset)
@@ -296,14 +372,20 @@ func _unhandled_input(event):
 					is_measuring = true
 					measure_start_pos = get_snapped_center(get_global_mouse_position())
 					measure_end_pos = measure_start_pos
+					_sync_local_measurement() # Відправляємо початок вимірювання
 				else:
 					is_measuring = false
+					_clear_local_measurement() # Видаляємо лінійку, коли відпустили мишку
 			elif event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
 				is_measuring = false
+				_clear_local_measurement()
 			token_layer.queue_redraw()
+			
 		elif event is InputEventMouseMotion and is_measuring:
 			measure_end_pos = get_snapped_center(get_global_mouse_position())
+			_sync_local_measurement() # Оновлюємо лінійку для всіх під час руху мишки!
 			token_layer.queue_redraw()
+
 
 func _change_tool_shortcut(new_mode: int):
 	# Don't try to change the tool manually here. 
@@ -313,18 +395,33 @@ func _change_tool_shortcut(new_mode: int):
 
 func _clear_selection():
 	for token in selected_tokens:
-		if token.has_method("set_selected"): token.set_selected(false)
+		if is_instance_valid(token):
+			if token.has_method("set_selected"): token.set_selected(false)
+			
+			# Restore normal color, but keep it translucent if it was hidden!
+			if token.get("data") and token.data.get("is_hidden", false):
+				token.modulate = Color(1, 1, 1, 0.4) 
+			else:
+				token.modulate = Color.WHITE
 	selected_tokens.clear()
 
 func _select_tokens_in_box():
 	var selection_rect = Rect2(drag_start, drag_end - drag_start).abs()
-	selected_tokens.clear()
+	var is_holding_shift = Input.is_key_pressed(KEY_SHIFT)
+	
+	# If the GM isn't holding shift, wipe the old selection before boxing new ones
+	if not is_holding_shift:
+		_clear_selection()
+		
 	for token in token_layer.get_children():
 		if selection_rect.has_point(token.global_position):
-			selected_tokens.append(token)
-			if token.has_method("set_selected"): token.set_selected(true)
-		else:
-			if token.has_method("set_selected"): token.set_selected(false)
+			if not token in selected_tokens:
+				selected_tokens.append(token)
+				if token.has_method("set_selected"): token.set_selected(true)
+				
+				# Make the token glow so the GM knows it's grabbed
+				token.modulate = Color(1.5, 1.5, 1.5)
+
 
 func _on_token_layer_draw():
 	if is_drawing_box:
@@ -335,54 +432,57 @@ func _on_token_layer_draw():
 	if is_drawing_wall:
 		token_layer.draw_line(wall_start_pos, wall_end_pos, Color.RED, 4.0)
 		
+	# --- DRAW NETWORK MEASUREMENTS (Інші гравці) ---
+	for peer_id in network_measurements.keys():
+		var data = network_measurements[peer_id]
+		_draw_ruler_shape(data["start"], data["end"], data["shape"], Color(data["color"]))
+		
+	# --- DRAW LOCAL MEASUREMENT (Ваша лінійка) ---
 	if is_measuring:
-		var grid_size = 64.0
-		var raw_distance = measure_start_pos.distance_to(measure_end_pos)
-		
-		# --- THE 5-FOOT SNAP LOGIC ---
-		# Round the distance to the nearest grid square (64 pixels)
-		var pixel_distance = round(raw_distance / grid_size) * grid_size
-		
-		# Prevent a 0ft circle if you just clicked and dragged your mouse slightly
-		if pixel_distance < grid_size and raw_distance > 10.0:
-			pixel_distance = grid_size
-			
-		var fill_color = Color(0.987, 0.536, 0.942, 0.3) # Semi-transparent purple
-		var line_color = Color(0.987, 0.536, 0.942, 0.8) # Solid purple
-		
-		# --- DRAW THE SHAPES ---
-		if current_measure_shape == MeasureShape.LINE:
-			token_layer.draw_line(measure_start_pos, measure_end_pos, line_color, 6.0)
-			
-		elif current_measure_shape == MeasureShape.CIRCLE:
-			# The circle will now pop outward in exact 64-pixel (5ft) increments!
-			token_layer.draw_circle(measure_start_pos, pixel_distance, fill_color)
-			token_layer.draw_arc(measure_start_pos, pixel_distance, 0, TAU, 64, line_color, 4.0)
-			
-		elif current_measure_shape == MeasureShape.CONE:
-			# Standard 53.13 degree TTRPG cone geometry, also snapped to 5ft increments
-			var angle = measure_start_pos.angle_to_point(measure_end_pos)
-			var cone_angle = deg_to_rad(53.13) 
-			
-			var p1 = measure_start_pos + Vector2(cos(angle - cone_angle/2.0), sin(angle - cone_angle/2.0)) * pixel_distance
-			var p2 = measure_start_pos + Vector2(cos(angle + cone_angle/2.0), sin(angle + cone_angle/2.0)) * pixel_distance
-			
-			var points = PackedVector2Array([measure_start_pos, p1, p2])
-			token_layer.draw_polygon(points, PackedColorArray([fill_color, fill_color, fill_color]))
-			token_layer.draw_polyline(PackedVector2Array([measure_start_pos, p1, p2, measure_start_pos]), line_color, 4.0)
+		var local_color = Color("#ffd700") if GameState.is_gm_mode else Color(GameState.player_color_hex)
+		_draw_ruler_shape(measure_start_pos, measure_end_pos, int(current_measure_shape), local_color)
 
-		# --- DRAW THE DISTANCE TEXT ---
-		var feet_distance = (pixel_distance / grid_size) * 5.0
-		var distance_text = str(round(feet_distance)) + " ft."
+# --- ДОПОМІЖНА ФУНКЦІЯ МАЛЮВАННЯ ФІГУР ---
+func _draw_ruler_shape(start: Vector2, end: Vector2, shape: int, base_color: Color):
+	var grid_size = 64.0
+	var raw_distance = start.distance_to(end)
+	var pixel_distance = round(raw_distance / grid_size) * grid_size
+	
+	if pixel_distance < grid_size and raw_distance > 10.0:
+		pixel_distance = grid_size
 		
-		var text_pos = measure_end_pos
-		if current_measure_shape == MeasureShape.LINE:
-			text_pos = (measure_start_pos + measure_end_pos) / 2.0
-			
-		var font = ThemeDB.fallback_font
-		token_layer.draw_string(font, text_pos + Vector2(2, 22), distance_text, HORIZONTAL_ALIGNMENT_CENTER, -1, 24, Color.BLACK)
-		token_layer.draw_string(font, text_pos + Vector2(0, 20), distance_text, HORIZONTAL_ALIGNMENT_CENTER, -1, 24, Color.WHITE)
+	var fill_color = base_color
+	fill_color.a = 0.3 # Напівпрозора заливка
+	var line_color = base_color
+	line_color.a = 0.9 # Яскрава лінія
+	
+	if shape == MeasureShape.LINE:
+		token_layer.draw_line(start, end, line_color, 6.0)
+		
+	elif shape == MeasureShape.CIRCLE:
+		token_layer.draw_circle(start, pixel_distance, fill_color)
+		token_layer.draw_arc(start, pixel_distance, 0, TAU, 64, line_color, 4.0)
+		
+	elif shape == MeasureShape.CONE:
+		var angle = start.angle_to_point(end)
+		var cone_angle = deg_to_rad(53.13) 
+		var p1 = start + Vector2(cos(angle - cone_angle/2.0), sin(angle - cone_angle/2.0)) * pixel_distance
+		var p2 = start + Vector2(cos(angle + cone_angle/2.0), sin(angle + cone_angle/2.0)) * pixel_distance
+		var points = PackedVector2Array([start, p1, p2])
+		
+		token_layer.draw_polygon(points, PackedColorArray([fill_color, fill_color, fill_color]))
+		token_layer.draw_polyline(PackedVector2Array([start, p1, p2, start]), line_color, 4.0)
 
+	# МАЛЮЄМО ТЕКСТ ДИСТАНЦІЇ
+	var feet_distance = (pixel_distance / grid_size) * 5.0
+	var distance_text = str(round(feet_distance)) + " ft."
+	var text_pos = end
+	if shape == MeasureShape.LINE:
+		text_pos = (start + end) / 2.0
+		
+	var font = ThemeDB.fallback_font
+	token_layer.draw_string(font, text_pos + Vector2(2, 22), distance_text, HORIZONTAL_ALIGNMENT_CENTER, -1, 24, Color.BLACK)
+	token_layer.draw_string(font, text_pos + Vector2(0, 20), distance_text, HORIZONTAL_ALIGNMENT_CENTER, -1, 24, Color.WHITE)
 
 func _spawn_permanent_wall(start: Vector2, end: Vector2):
 	if start.distance_to(end) < 5.0: return
@@ -410,41 +510,50 @@ func _spawn_permanent_wall(start: Vector2, end: Vector2):
 	wall_layer.add_child(new_wall)
 
 func _on_roll_init_btn_pressed():
-	if not multiplayer.is_server(): return # Extra security: Only the Host can roll
+	if not multiplayer.is_server(): return
 	
 	var all_tokens = $TokenLayer.get_children()
-	var active_tokens = []
 	
 	for token in all_tokens:
-		if "data" in token: 
-			# Only roll fresh dice if they are an enemy, or if they haven't rolled yet (score is 0)
-			if token.data.get("faction", "neutral") == "enemy" or token.data.get("current_init", 0) == 0:
-				var roll = randi_range(1, 20)
-				token.update_data("current_init", roll + token.data.get("init_bonus", 0))
-				
-			# We still append EVERYONE to active_tokens so players don't get left off the scoreboard
-			if token.data.get("current_init", 0) > 0:
-				active_tokens.append(token)
+		if "data" in token:
+			var faction = str(token.data.get("faction", "neutral")).to_lower()
+			var current = int(token.data.get("current_init", 0))
 			
-	active_tokens.sort_custom(_sort_highest_init)
+			# Кидаємо кубик ТІЛЬКИ якщо це ворог, або якщо ініціатива ще 0
+			if faction == "enemy" or current == 0:
+				var roll = randi_range(1, 20)
+				var total = roll + int(token.data.get("init_bonus", 0))
+				
+				# Захист від нескінченного циклу: якщо гравець викинув рівно 0, 
+				# робимо його -1, щоб система знала, що він ВЖЕ кидав кубик!
+				if total == 0: total = -1
+				
+				token.data["current_init"] = total
+				
+				if token.has_method("update_data"):
+					token.update_data("current_init", total, true)
+					
+	_refresh_and_sync_initiative()
 	
-	# 1. Update the GM's local UI
-	_populate_initiative_ui(active_tokens)
-	
-	# 2. Build a "Scoreboard" to send to the players
-	var sync_data = []
-	for t in active_tokens:
-		sync_data.append({
-			"name": t.data["name"],
-			"init": t.data["current_init"],
-			"faction": t.data.get("faction", "neutral")
-		})
-		
-	# 3. Beam the scoreboard to everyone else!
-	rpc("receive_initiative_sync", sync_data)
 
 func _sort_highest_init(a, b):
-	return a.data.get("current_init", 0) > b.data.get("current_init", 0)
+	# Safely fallback to 0 if the data is somehow missing so the game doesn't crash
+	return int(a.data.get("current_init", 0)) > int(b.data.get("current_init", 0))
+
+func _on_reset_init_btn_pressed() -> void:
+	if not multiplayer.is_server(): return 
+	
+	for token in $TokenLayer.get_children():
+		if "data" in token: 
+			# Повертаємо всіх до 0 (що означає "ще не кидали")
+			token.data["current_init"] = 0
+			if token.has_method("update_data"): 
+				token.update_data("current_init", 0, true)
+			
+	for child in token_list.get_children(): child.queue_free()
+	current_turn_index = 0
+	
+	rpc("receive_initiative_sync", [])
 
 func _populate_initiative_ui(sorted_tokens: Array):
 	for child in token_list.get_children(): child.queue_free()
@@ -463,6 +572,35 @@ func _populate_initiative_ui(sorted_tokens: Array):
 		row.add_child(name_label)
 		row.add_child(score_label)
 		token_list.add_child(row)
+
+func _refresh_and_sync_initiative():
+	var all_tokens = $TokenLayer.get_children()
+	var active_tokens = []
+	
+	for token in all_tokens:
+		if "data" in token:
+			# Додаємо у список ходів ТІЛЬКИ тих, чия ініціатива не дорівнює 0
+			var current = int(token.data.get("current_init", 0))
+			if current != 0:
+				active_tokens.append(token)
+			
+	active_tokens.sort_custom(_sort_highest_init)
+	
+	_populate_initiative_ui(active_tokens)
+	
+	var sync_data = []
+	for t in active_tokens:
+		sync_data.append({
+			"name": t.data["name"],
+			"init": t.data["current_init"],
+			"faction": t.data.get("faction", "neutral")
+		})
+		
+	rpc("receive_initiative_sync", sync_data)
+	_highlight_active_initiative_ui()
+
+
+
 
 func _on_back_menu_pressed():
 	# 1. Force a final auto-save if you are the Host
@@ -486,8 +624,11 @@ func _on_gm_mode_changed(is_gm: bool):
 	# 2. Hide Initiative controls from players
 	if roll_init_btn: roll_init_btn.visible = is_gm
 	if reset_init_btn: reset_init_btn.visible = is_gm
-		
-	# 3. THE FIX: Everyone starts in the dark! 
+	
+	if player_toolbar:
+		player_toolbar.visible = not is_gm
+	
+	# 4. THE FIX: Everyone starts in the dark! 
 	# The GM can manually turn the lights on using their Fog toggle switch.
 	darkness.visible = true
 
@@ -568,13 +709,28 @@ func _on_gm_dashboard_map_scale_changed(new_scale: float):
 func _on_gm_dashboard_map_loaded(file_path: String):
 	if multiplayer.is_server():
 		NetworkManager.send_image_to_all(file_path, "map")
+		
 	current_map_path = file_path
 	var image = Image.load_from_file(file_path)
+	
 	if image:
 		var tex = ImageTexture.create_from_image(image)
-		map_layer.texture = tex
-		var grid_node = $MapLayer/GridOverlay
-		if grid_node: grid_node.update_grid(tex.get_size())
+		
+		# 1. Apply the texture to the actual SPRITE node, not the layer!
+		var map_sprite = get_node_or_null("MapLayer/MapSprite")
+		if map_sprite:
+			map_sprite.texture = tex
+			
+		# 2. Update the Grid Overlay
+		var grid_node = get_node_or_null("MapLayer/GridOverlay")
+		if grid_node and grid_node.has_method("update_grid"): 
+			grid_node.update_grid(tex.get_size())
+			
+		# 3. APPLY THE SCALE LAST!
+		# Doing this after the image loads guarantees the grid and visuals align.
+		var current_map_scale = CampaignManager.campaign_data.get("map_scale", 1.0)
+		receive_map_scale_sync(current_map_scale)
+		
 	else:
 		push_error("Failed to load map: " + file_path)
 
@@ -646,17 +802,6 @@ func _on_roll_btn_pressed() -> void:
 		var color = "#ffd700" if GameState.is_gm_mode else "#99ccff"
 		rpc("receive_chat_message", my_name, public_msg, color)
 
-func _on_reset_init_btn_pressed() -> void:
-	if not multiplayer.is_server(): return # Only the host can do this
-	
-	for token in $TokenLayer.get_children():
-		if "data" in token: token.update_data("current_init", 0)
-		
-	# Clear GM UI
-	for child in token_list.get_children(): child.queue_free()
-	
-	# Tell players to clear their UI
-	rpc("receive_initiative_sync", [])
 
 func _on_gm_dashboard_save_requested(path: String):
 	_save_pcs_to_vault() # <--- Backup players before saving!
@@ -678,7 +823,7 @@ func _on_gm_dashboard_save_requested(path: String):
 			scene_data["walls"].append({"start_x": wall.points[0].x, "start_y": wall.points[0].y, "end_x": wall.points[1].x, "end_y": wall.points[1].y})
 
 	CampaignManager.campaign_data["scenes"][current_scene_id] = scene_data
-	CampaignManager.campaign_data["quests"] = quest_tracker.quests
+	
 	
 	var json_string = JSON.stringify(CampaignManager.campaign_data, "\t")
 	if json_string == "":
@@ -751,8 +896,7 @@ func _on_gm_dashboard_load_requested(path: String):
 		_spawn_permanent_wall(Vector2(w_data["start_x"], w_data["start_y"]), Vector2(w_data["end_x"], w_data["end_y"]))
 		
 	if CampaignManager.campaign_data.has("quests"):
-		quest_tracker.quests = CampaignManager.campaign_data["quests"]
-		quest_tracker._update_ui()
+		get_tree().call_group("quest_ui", "refresh_quests")
 		
 	# Sync the loaded fog state to the players
 	if CampaignManager.campaign_data.has("fog"):
@@ -850,6 +994,75 @@ func _on_gm_dashboard_spawn_party_requested():
 	# Drop the party exactly where the GM is currently looking!
 	spawn_entire_party($GMCamera.global_position)
 
+
+func _setup_player_toolbar():
+	player_toolbar = PanelContainer.new()
+	
+	# Додаємо трохи простору навколо кнопок
+	var margin = MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 8)
+	margin.add_theme_constant_override("margin_right", 8)
+	margin.add_theme_constant_override("margin_top", 8)
+	margin.add_theme_constant_override("margin_bottom", 8)
+	player_toolbar.add_child(margin)
+	
+	var hbox = HBoxContainer.new()
+	margin.add_child(hbox)
+	
+	var tools = [
+		{"name": "👆 Select", "mode": Mode.SELECT, "shape": MeasureShape.LINE},
+		{"name": "📏 Line", "mode": Mode.MEASURE, "shape": MeasureShape.LINE},
+		{"name": "⭕ Circle", "mode": Mode.MEASURE, "shape": MeasureShape.CIRCLE},
+		{"name": "📐 Cone", "mode": Mode.MEASURE, "shape": MeasureShape.CONE}
+	]
+	
+	for t in tools:
+		var btn = Button.new()
+		btn.text = t["name"]
+		btn.pressed.connect(func():
+			current_mode = t["mode"]
+			current_measure_shape = t["shape"]
+		)
+		hbox.add_child(btn)
+		
+	$UILayer.add_child(player_toolbar)
+	
+	# РОЗМІЩУЄМО У ВЕРХНЬОМУ ЛІВОМУ КУТІ (Подалі від квестів)
+	player_toolbar.position = Vector2(20, 20)
+	player_toolbar.z_index = 50 # Гарантуємо, що вона поверх усього
+	
+	player_toolbar.visible = not GameState.is_gm_mode
+
+
+# ==========================================
+# NETWORKED RULERS SYSTEM
+# ==========================================
+func _sync_local_measurement():
+	var hex_color = "#ffd700" if GameState.is_gm_mode else GameState.player_color_hex
+	# Використовуємо UNRELIABLE, щоб це не викликало лагів при швидкому русі мишки
+	rpc("receive_measurement_sync", measure_start_pos, measure_end_pos, int(current_measure_shape), hex_color)
+
+func _clear_local_measurement():
+	rpc("receive_measurement_clear")
+
+@rpc("any_peer", "call_remote", "unreliable")
+func receive_measurement_sync(start_pos: Vector2, end_pos: Vector2, shape_idx: int, color_hex: String):
+	var sender_id = multiplayer.get_remote_sender_id()
+	network_measurements[sender_id] = {
+		"start": start_pos,
+		"end": end_pos,
+		"shape": shape_idx,
+		"color": color_hex
+	}
+	if token_layer: token_layer.queue_redraw()
+
+@rpc("any_peer", "call_remote", "reliable")
+func receive_measurement_clear():
+	var sender_id = multiplayer.get_remote_sender_id()
+	if network_measurements.has(sender_id):
+		network_measurements.erase(sender_id)
+		if token_layer: token_layer.queue_redraw()
+
 # ==========================================
 # PC VAULT (PERSISTENT CHARACTERS)
 # ==========================================
@@ -893,9 +1106,14 @@ func spawn_entire_party(drop_pos: Vector2):
 func _local_spawn_vault_token(v_data: Dictionary, pos: Vector2, token_id: String):
 	var new_token = TOKEN_SCENE.instantiate()
 	new_token.name = token_id
-	new_token.art_path = v_data["art_path"]
-	new_token.height_offset = v_data["height_offset"]
-	new_token.data = v_data["data"].duplicate() # INJECT THE SAVED BRAIN!
+	new_token.art_path = v_data.get("art_path", "")
+	new_token.height_offset = v_data.get("height_offset", 0.0)
+	if v_data.has("data"):
+		new_token.data = v_data.get("data").duplicate()
+	else:
+		# Fallback just in case v_data itself IS the brain dictionary
+		new_token.data = v_data.duplicate(true)
+		
 	token_layer.add_child(new_token)
 	new_token.global_position = pos
 
@@ -945,6 +1163,36 @@ func spawn_single_vault_token(pc_name: String, drop_pos: Vector2):
 # ==========================================
 
 # ==========================================
+# MAP SCALE NETWORK SYNC
+# ==========================================
+func _on_dashboard_map_scale_changed(new_scale: float) -> void:
+	# Only the GM is allowed to dictate the global map scale!
+	if GameState.is_gm_mode:
+		rpc("receive_map_scale_sync", new_scale)
+		receive_map_scale_sync(new_scale)
+
+@rpc("authority", "call_remote", "reliable")
+func receive_map_scale_sync(new_scale: float) -> void:
+	# 1. Save it to the universal brain so it saves to the campaign file
+	CampaignManager.campaign_data["map_scale"] = new_scale
+	
+	# 2. Update the Dashboard SpinBox visually for the GM so it stays in sync
+	if gm_dashboard and gm_dashboard.map_scale_spin_box:
+		gm_dashboard.map_scale_spin_box.set_value_no_signal(new_scale)
+	
+	# 3. APPLY THE VISUALS (Fixed Path!)
+	var map_sprite = get_node_or_null("MapLayer/MapSprite") 
+	if map_sprite:
+		map_sprite.scale = Vector2(new_scale, new_scale)
+		
+	# Bonus: If your GridOverlay draws based on the map's scale, 
+	# you might need to tell it to redraw here!
+	var grid_overlay = get_node_or_null("MapLayer/GridOverlay")
+	if grid_overlay and grid_overlay.has_method("queue_redraw"):
+		grid_overlay.queue_redraw()
+
+
+# ==========================================
 # FOG SYNCING
 # ==========================================
 @rpc("authority", "call_remote", "reliable")
@@ -961,19 +1209,25 @@ func receive_fog_update(new_fog_data: Variant) -> void:
 # PLAYER ROSTER SYNCING
 # ==========================================
 
+func get_uuid_from_name(target_name: String) -> String:
+	# Searches the connected players for a matching name and returns their Supabase UUID
+	for peer_id in connected_players.keys():
+		var p_data = connected_players[peer_id]
+		if p_data.get("name", "").to_lower() == target_name.to_lower():
+			return p_data.get("uuid", "")
+	return ""
+
 # 1. A joining player whispers their name to the GM
 @rpc("any_peer", "call_remote", "reliable")
-func register_player_with_gm(player_name: String):
-	if not multiplayer.is_server(): return # Only the GM accepts registrations
+func register_player_with_gm(player_name: String, player_uuid: String = ""):
+	var peer_id = multiplayer.get_remote_sender_id()
 	
-	var sender_id = multiplayer.get_remote_sender_id()
-	
-	# Add the new player to the GM's master dictionary
-	connected_players[sender_id] = {"name": player_name, "role": "PLAYER"}
+	# Save it to the GM's roster
+	connected_players[peer_id] = {"name": player_name, "role": "PLAYER", "uuid": player_uuid}
 	_update_player_list_ui()
 	
-	# Now, the GM shouts the updated master list to EVERYONE
-	rpc("sync_roster_to_players", connected_players)
+	# Tell everyone else that someone joined (if you have this function)
+	rpc("update_roster_for_all", connected_players)
 
 # 2. The GM tells all players exactly who is currently at the table
 @rpc("authority", "call_remote", "reliable")
@@ -1116,30 +1370,31 @@ func request_board_sync():
 	for wall in wall_layer.get_children():
 		if wall is Line2D and wall.points.size() >= 2:
 			live_scene_data["walls"].append({"start_x": wall.points[0].x, "start_y": wall.points[0].y, "end_x": wall.points[1].x, "end_y": wall.points[1].y})
-
+		
 	CampaignManager.campaign_data["scenes"][current_scene_id] = live_scene_data
-	CampaignManager.campaign_data["quests"] = quest_tracker.quests
-
-	var global_quests = CampaignManager.campaign_data.get("quests", [])
+	
+		
+	var global_quests = CampaignManager.campaign_data.get("quests", {})
 	rpc_id(requester_id, "receive_board_sync", current_scene_id, live_scene_data, global_quests)
 
 @rpc("authority", "call_remote", "reliable")
-func receive_board_sync(scene_id: String, scene_data: Dictionary, quests_data: Array):
+func receive_board_sync(scene_id: String, scene_data: Dictionary, quests_data: Dictionary):
 	# WIPE GHOST TOWN
 	for token in token_layer.get_children(): token.queue_free()
 	for wall in wall_layer.get_children(): wall.queue_free()
 	selected_tokens.clear()
 	
 	# MATCH SCENE DROPDOWN
-	var dropdown = gm_dashboard.scene_dropdown
-	for i in range(dropdown.get_item_count()):
-		if dropdown.get_item_metadata(i) == scene_id:
-			dropdown.select(i)
-			break
-	
-	if quest_tracker:
-		quest_tracker.quests = quests_data
-		quest_tracker._update_ui()
+	# Safely update the new custom scene button text instead of the old dropdown
+	if gm_dashboard and gm_dashboard.get("scene_select_btn"):
+		var display_name = scene_id
+		if ":" in scene_id:
+			var parts = scene_id.split(":", true, 1)
+			display_name = parts[1].strip_edges()
+		gm_dashboard.scene_select_btn.text = display_name
+	# -----------------------------
+	CampaignManager.campaign_data["quests"] = quests_data
+	get_tree().call_group("quest_ui", "refresh_quests")
 	
 	if scene_data.get("map_image_path", "") != "":
 		_on_gm_dashboard_map_loaded(scene_data["map_image_path"])
@@ -1184,16 +1439,36 @@ func receive_wall_erase(start: Vector2, end: Vector2):
 				wall.queue_free()
 				break
 
-# --- QUEST SYNCING ---
-func broadcast_quests_update():
+# ==========================================
+# QUEST SYSTEM HUB
+# ==========================================
+@rpc("any_peer", "call_remote", "reliable")
+func request_update_quest(quest_id: String, quest_data: Dictionary):
 	if multiplayer.is_server():
-		rpc("receive_quests_update", quest_tracker.quests)
+		if not CampaignManager.campaign_data.has("quests"):
+			CampaignManager.campaign_data["quests"] = {}
+			
+		CampaignManager.campaign_data["quests"][quest_id] = quest_data
+		
+		# Send updated dictionary to all players
+		rpc("receive_quests_sync", CampaignManager.campaign_data["quests"])
+		receive_quests_sync(CampaignManager.campaign_data["quests"]) # Run locally for GM
+
+@rpc("any_peer", "call_remote", "reliable")
+func request_delete_quest(quest_id: String):
+	if multiplayer.is_server():
+		if CampaignManager.campaign_data.has("quests") and CampaignManager.campaign_data["quests"].has(quest_id):
+			CampaignManager.campaign_data["quests"].erase(quest_id)
+			
+			rpc("receive_quests_sync", CampaignManager.campaign_data["quests"])
+			receive_quests_sync(CampaignManager.campaign_data["quests"])
 
 @rpc("authority", "call_remote", "reliable")
-func receive_quests_update(updated_quests: Array):
-	if quest_tracker:
-		quest_tracker.quests = updated_quests
-		quest_tracker._update_ui()
+func receive_quests_sync(all_quests: Dictionary):
+	CampaignManager.campaign_data["quests"] = all_quests
+	
+	# Instantly updates both the QuestWindow and the Pinned HUD!
+	get_tree().call_group("quest_ui", "refresh_quests")
 
 # --- TOKEN DATA SYNCING ---
 func broadcast_token_data_update(token_name: String, key: String, new_value: Variant):
@@ -1270,6 +1545,104 @@ func receive_token_data_update(token_name: String, key: String, new_value: Varia
 # ==========================================
 # TOKEN OWNERSHIP & HIDING
 # ==========================================
+
+# ==========================================
+# BULK AOE DAMAGE SYSTEM
+# ==========================================
+func _setup_aoe_dialog():
+	aoe_dialog = ConfirmationDialog.new()
+	aoe_dialog.title = "Bulk AoE Damage"
+	
+	var vbox = VBoxContainer.new()
+	var label = Label.new()
+	label.text = "Enter amount (- for Damage, + for Healing):"
+	vbox.add_child(label)
+	
+	aoe_input = SpinBox.new()
+	aoe_input.min_value = -9999
+	aoe_input.max_value = 9999
+	aoe_input.value = -10 
+	aoe_input.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(aoe_input)
+	
+	aoe_dialog.add_child(vbox)
+	add_child(aoe_dialog)
+	
+	aoe_dialog.confirmed.connect(_apply_bulk_damage)
+
+func _apply_bulk_damage():
+	var amount = int(aoe_input.value)
+	if amount == 0: return
+	
+	var hp_key = "hp" # Match to your template
+	
+	for token in selected_tokens:
+		if is_instance_valid(token) and "data" in token:
+			var current_hp = int(token.data.get(hp_key, 0))
+			var new_hp = max(0, current_hp + amount)
+			
+			token.data[hp_key] = new_hp
+			broadcast_token_data_update(token.name, hp_key, new_hp)
+			
+			# USE THE NEW UNIVERSAL HUB!
+			broadcast_floating_text(token.name, amount)
+
+# ==========================================
+# UNIVERSAL FLOATING TEXT HUB
+# ==========================================
+func broadcast_floating_text(token_name: String, amount: int):
+	# 1. OBEY THE MASTER SWITCH
+	if not GameState.show_floating_text: return
+	
+	# 2. ROUTE THE ANIMATION OVER THE NETWORK
+	if multiplayer.is_server():
+		receive_floating_text(token_name, amount) # Show on GM screen
+		rpc("receive_floating_text", token_name, amount) # Beam to players
+	else:
+		rpc_id(1, "request_floating_text", token_name, amount) # Ask GM to beam it
+
+@rpc("any_peer", "call_remote", "unreliable")
+func request_floating_text(token_name: String, amount: int):
+	if multiplayer.is_server():
+		receive_floating_text(token_name, amount)
+		rpc("receive_floating_text", token_name, amount)
+
+@rpc("any_peer", "call_remote", "unreliable")
+func receive_floating_text(token_name: String, amount: int):
+	var token = token_layer.get_node_or_null(token_name)
+	if not token: return
+	
+	var float_lbl = Label.new()
+	float_lbl.text = str(amount) if amount < 0 else "+" + str(amount)
+	
+	# Green for healing (+), Red for damage (-)
+	var text_color = Color(0.2, 0.8, 0.2) if amount > 0 else Color(0.9, 0.2, 0.2)
+	float_lbl.add_theme_color_override("font_color", text_color)
+	
+	# Thick black outline so it's readable over any map background
+	float_lbl.add_theme_color_override("font_outline_color", Color.BLACK)
+	float_lbl.add_theme_constant_override("outline_size", 8)
+	float_lbl.add_theme_font_size_override("font_size", 42)
+	
+	# Start it just above the token's head
+	float_lbl.global_position = token.global_position + Vector2(-20, -50)
+	
+	# Ensure it draws on top of the tokens
+	float_lbl.z_index = 10 
+	token_layer.add_child(float_lbl)
+	
+# --- THE ANIMATION TWEEN ---
+	var tween = get_tree().create_tween()
+	
+	# Float upward 60 pixels (Using EASE_OUT makes it slow down smoothly as it reaches the top)
+	tween.tween_property(float_lbl, "global_position", float_lbl.global_position + Vector2(0, -60), 1.5).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	
+	# Fade to transparent at the same time (Using EASE_IN makes it fade faster at the very end)
+	tween.parallel().tween_property(float_lbl, "modulate:a", 0.0, 1.5).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+	
+	# Destroy the node once the animation finishes
+	tween.tween_callback(float_lbl.queue_free)
+
 
 # --- TOKEN DELETION ---
 func delete_token_networked(token_name: String):
@@ -1525,35 +1898,8 @@ func receive_whisper(formatted_msg: String):
 	chat_log.append_text(formatted_msg)
 
 # ==========================================
-# INITIATIVE RECEIVER
+# INITIATIVE RECEIVER & TURN TRACKER
 # ==========================================
-func _refresh_and_sync_initiative():
-	var all_tokens = $TokenLayer.get_children()
-	var active_tokens = []
-	
-	# Gather everyone who has rolled higher than 0
-	for token in all_tokens:
-		if "data" in token and token.data.get("current_init", 0) > 0:
-			active_tokens.append(token)
-			
-	# Sort them using your existing highest-to-lowest function
-	active_tokens.sort_custom(_sort_highest_init)
-	
-	# 1. Update the GM's local UI
-	_populate_initiative_ui(active_tokens)
-	
-	# 2. Build the exact "Scoreboard" format your players expect
-	var sync_data = []
-	for t in active_tokens:
-		sync_data.append({
-			"name": t.data["name"],
-			"init": t.data["current_init"],
-			"faction": t.data.get("faction", "neutral")
-		})
-		
-	# 3. Beam the perfectly sorted scoreboard to everyone!
-	rpc("receive_initiative_sync", sync_data)
-
 
 @rpc("authority", "call_remote", "reliable")
 func receive_initiative_sync(sync_data: Array):
@@ -1561,8 +1907,9 @@ func receive_initiative_sync(sync_data: Array):
 	for child in token_list.get_children():
 		child.queue_free()
 		
-	# 2. If it's a reset (empty array), stop here
+	# 2. If it's a reset (empty array), stop here and reset the turn counter
 	if sync_data.size() == 0:
+		current_turn_index = 0
 		return
 		
 	# 3. Rebuild the list perfectly matching the GM's screen
@@ -1584,3 +1931,82 @@ func receive_initiative_sync(sync_data: Array):
 		row.add_child(name_label)
 		row.add_child(score_label)
 		token_list.add_child(row)
+		
+	# 4. Highlight whose turn it is on the newly built list!
+	_highlight_active_initiative_ui()
+
+
+# --- TURN MANAGEMENT LOGIC ---
+
+func _highlight_active_initiative_ui():
+	var rows = token_list.get_children()
+	for i in range(rows.size()):
+		var row = rows[i]
+		# Give the active row a gold highlight background
+		if i == current_turn_index:
+			row.modulate = Color(1.5, 1.5, 0.5) # Bright gold highlight!
+		else:
+			row.modulate = Color.WHITE
+
+func advance_turn():
+	if not multiplayer.is_server(): return
+	
+	var rows = token_list.get_children()
+	if rows.size() == 0: return # Nobody has rolled yet
+	
+	# Move to the next index, looping back to 0 at the end of the list
+	current_turn_index = (current_turn_index + 1) % rows.size()
+	
+	# Broadcast the new turn index to all clients
+	rpc("receive_turn_sync", current_turn_index)
+	receive_turn_sync(current_turn_index) # Run locally for the GM
+
+@rpc("authority", "call_remote", "reliable")
+func receive_turn_sync(new_index: int):
+	current_turn_index = new_index
+	
+	# Highlight the UI
+	_highlight_active_initiative_ui()
+	
+	# Tell all tokens on the board to recalculate their glowing visuals!
+	for token in $TokenLayer.get_children():
+		if token.has_method("update_visuals"):
+			token.update_visuals()
+
+# ==========================================
+# PING SYSTEM
+# ==========================================
+@rpc("any_peer", "call_remote", "unreliable")
+func receive_ping(pos: Vector2, color_hex: String):
+	# 1. Створюємо UI-панель
+	var ping = Panel.new()
+	ping.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ping.size = Vector2(100, 100)
+	ping.pivot_offset = Vector2(50, 50) # Центруємо для ідеального масштабування
+	ping.position = pos - ping.pivot_offset
+	ping.z_index = 20 # Малюємо пінг поверх усіх токенів
+	
+	# 2. Малюємо порожнє кільце за допомогою StyleBoxFlat
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0, 0, 0, 0) # Центр прозорий
+	style.border_color = Color(color_hex)
+	style.set_border_width_all(8) # Товщина кільця
+	# Робимо його ідеально круглим
+	style.corner_radius_top_left = 100
+	style.corner_radius_top_right = 100
+	style.corner_radius_bottom_left = 100
+	style.corner_radius_bottom_right = 100
+	ping.add_theme_stylebox_override("panel", style)
+	
+	add_child(ping)
+	
+	# 3. Анімуємо розширення та зникання!
+	var tween = get_tree().create_tween()
+	ping.scale = Vector2(0.1, 0.1) # Починаємо з крихітної крапки
+	
+	# Збільшуємо до 150% розміру та робимо прозорим за 1 секунду
+	tween.tween_property(ping, "scale", Vector2(1.5, 1.5), 1.0).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tween.parallel().tween_property(ping, "modulate:a", 0.0, 1.0).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	
+	# Видаляємо об'єкт після завершення, щоб не забивати пам'ять
+	tween.tween_callback(ping.queue_free)

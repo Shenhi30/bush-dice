@@ -9,8 +9,27 @@ var session_token: String = ""   # Optional: useful for direct API calls
 var is_gm_mode: bool = false
 var is_gm_vision_active: bool = false 
 var player_name: String = ""
+var player_uuid: String = ""
+
+var show_floating_text: bool = true
 
 signal gm_mode_changed(is_gm)
+
+var player_color_hex: String = "#ffffff" # Білий за замовчуванням
+
+func _ready():
+	load_player_settings()
+
+func save_player_settings(new_color_hex: String):
+	player_color_hex = new_color_hex
+	var config = ConfigFile.new()
+	config.set_value("Player", "color", player_color_hex)
+	config.save("user://player_settings.cfg")
+
+func load_player_settings():
+	var config = ConfigFile.new()
+	if config.load("user://player_settings.cfg") == OK:
+		player_color_hex = config.get_value("Player", "color", "#ffffff")
 
 # --- ROLE LOGIC ---
 func set_gm_mode(is_gm: bool):

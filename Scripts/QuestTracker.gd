@@ -1,16 +1,16 @@
 extends PanelContainer
 
-# Our data memory
-var quests: Array = []
-
 # Variables to hold the UI we are about to create
 var expandable_section: VBoxContainer
 var quest_list: VBoxContainer
-var quest_input: LineEdit
 
 func _ready():
-	# 1. SETUP THE MAIN PANEL
-	self.custom_minimum_size = Vector2(300, 0) # Make it at least 300px wide
+	# 1. LINK TO THE NETWORK HUB
+	# This tells Godot: "Whenever MainBoard says 'refresh_quests', update this UI!"
+	add_to_group("quest_ui")
+	
+	# 2. SETUP THE MAIN PANEL
+	self.custom_minimum_size = Vector2(300, 0)
 	
 	var margin = MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 10)
@@ -22,23 +22,33 @@ func _ready():
 	var main_vbox = VBoxContainer.new()
 	margin.add_child(main_vbox)
 	
-	# 2. CREATE THE TOGGLE BUTTON
+	# 3. CREATE THE HEADER (Toggle + Open Window)
+	var header_hbox = HBoxContainer.new()
+	main_vbox.add_child(header_hbox)
+	
 	var toggle_btn = Button.new()
-	toggle_btn.text = "📜 Quest Log"
+	toggle_btn.text = "📌 Pinned Quests"
+	toggle_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	toggle_btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	
 	# Remove the ugly grey background from the title button
 	toggle_btn.add_theme_stylebox_override("normal", StyleBoxEmpty.new())
 	toggle_btn.add_theme_stylebox_override("hover", StyleBoxEmpty.new())
 	toggle_btn.add_theme_stylebox_override("pressed", StyleBoxEmpty.new())
 	toggle_btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
-	main_vbox.add_child(toggle_btn)
+	header_hbox.add_child(toggle_btn)
 	
-	# 3. CREATE THE EXPANDABLE FOLDER
+	var open_log_btn = Button.new()
+	open_log_btn.text = "📖" # Або "Open Log"
+	header_hbox.add_child(open_log_btn)
+	
+	# 4. CREATE THE EXPANDABLE FOLDER
 	expandable_section = VBoxContainer.new()
 	main_vbox.add_child(expandable_section)
 	
 	main_vbox.add_child(HSeparator.new()) # A nice visual line
 	
-	# 4. CREATE THE SCROLL BOX
+	# 5. CREATE THE SCROLL BOX
 	var scroll = ScrollContainer.new()
 	scroll.custom_minimum_size = Vector2(0, 150)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -49,26 +59,12 @@ func _ready():
 	quest_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(quest_list)
 	
-	# 5. CREATE THE ADD QUEST INPUTS
-	var add_box = HBoxContainer.new()
-	expandable_section.add_child(add_box)
+	# (The Add/Edit inputs were removed here, as they belong in the new QuestWindow!)
 	
-	quest_input = LineEdit.new()
-	quest_input.placeholder_text = "New objective..."
-	quest_input.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	add_box.add_child(quest_input)
-	
-	var add_btn = Button.new()
-	add_btn.text = "Add"
-	add_box.add_child(add_btn)
-	
-	# 6. WIRE EVERYTHING UP (No Scene Tree needed!)
 	toggle_btn.pressed.connect(_on_toggle_pressed)
-	add_btn.pressed.connect(_on_add_pressed)
-	# Bonus feature: Hitting 'Enter' on the keyboard will also add the quest!
-	quest_input.text_submitted.connect(func(t): _on_add_pressed()) 
+	open_log_btn.pressed.connect(_on_open_log_pressed)
 	
-	_update_ui()
+	refresh_quests()
 
 # --- LOGIC FUNCTIONS ---
 
@@ -76,39 +72,62 @@ func _on_toggle_pressed():
 	expandable_section.visible = not expandable_section.visible
 	self.size = Vector2.ZERO # Force the main panel to shrink
 
-func _on_add_pressed():
-	var text = quest_input.text.strip_edges()
-	if text == "": 
-		return # Don't add blank quests
+func _on_open_log_pressed():
+	# Шукаємо наше велике вікно квестів у дереві сцени та відкриваємо його
+	var quest_window = get_tree().root.find_child("QuestWindow", true, false)
+	if quest_window:
+		quest_window.visible = true
 		
-	quests.append({"title": text})
-	quest_input.text = "" # Clear the box
-	_update_ui()
+		# Якщо це Window, викликаємо grab_focus/move_to_front
+		if quest_window.has_method("move_to_front"):
+			quest_window.move_to_front()
+	else:
+		print("ERROR: QuestWindow не знайдено! Переконайтеся, що ви додали його в UILayer.")
 
-func _update_ui():
-	# Clear old list
+
+# This replaces your old _update_ui(). It is called automatically by MainBoard!
+func refresh_quests():
+	# 1. Clear old list
 	for child in quest_list.get_children():
 		child.queue_free()
 		
-	# Draw new list
-	for quest in quests:
-		var btn = Button.new()
-		btn.text = "• " + quest["title"]
-		btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		btn.autowrap_mode = TextServer.AUTOWRAP_WORD
+	# 2. Grab the global memory
+	var all_quests = CampaignManager.campaign_data.get("quests", {})
+	
+	# --- THE FIX: HANDLE LEGACY ARRAYS ---
+	# If an old save file still has quests saved as an Array [],
+	# wipe it and turn it into a Dictionary {} to prevent crashes!
+	if typeof(all_quests) == TYPE_ARRAY:
+		all_quests = {}
+		CampaignManager.campaign_data["quests"] = {}
+	# -------------------------------------
+	
+	# 3. Draw the new list
+	for q_id in all_quests.keys():
+		var q_data = all_quests[q_id]
 		
-		# Make it look like plain text
-		var empty_style = StyleBoxEmpty.new()
-		btn.add_theme_stylebox_override("normal", empty_style)
-		btn.add_theme_stylebox_override("pressed", empty_style)
-		btn.add_theme_stylebox_override("focus", empty_style)
-		btn.add_theme_stylebox_override("hover", empty_style)
-		btn.add_theme_color_override("font_hover_color", Color(1.0, 0.4, 0.4)) # Red on hover
-		
-		# Wire up the delete function
-		btn.pressed.connect(func():
-			quests.erase(quest)
-			_update_ui()
-		)
-		
-		quest_list.add_child(btn)
+		# ONLY SHOW IT IF IT IS PINNED!
+		if q_data.get("pinned", false):
+			var quest_ui = VBoxContainer.new()
+			
+			# Title
+			var title = Label.new()
+			title.text = "• " + q_data.get("title", "Unknown Quest")
+			title.add_theme_color_override("font_color", Color(1.0, 0.8, 0.2)) # Gold title
+			title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			quest_ui.add_child(title)
+			
+			# Description (Optional)
+			var desc_text = q_data.get("desc", "").strip_edges()
+			if desc_text != "":
+				var desc = Label.new()
+				desc.text = desc_text
+				desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+				desc.add_theme_font_size_override("font_size", 12) 
+				desc.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7)) # Grey text
+				quest_ui.add_child(desc)
+			
+			# Add a faint separator line between pinned quests
+			quest_ui.add_child(HSeparator.new())
+			
+			quest_list.add_child(quest_ui)

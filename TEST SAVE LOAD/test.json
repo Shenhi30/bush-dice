@@ -2,18 +2,77 @@
 	"active_scene_id": "default_map",
 	"backpacks": {},
 	"campaign_name": "New Campaign",
+	"map_scale": 1.0,
 	"pc_vault": {
+		"Goddes of pleasure": {
+			"acrobatics_total": -5.0,
+			"animal_handling_total": -5.0,
+			"arcana_total": -5.0,
+			"armor_class": 0.0,
+			"art_path": "user://tokens/God Champions//Goddes of pleasure.jpg",
+			"athletics_total": -5.0,
+			"cha": 0.0,
+			"cha_mod": -5.0,
+			"cha_save_total": -5.0,
+			"con": 0.0,
+			"con_mod": -5.0,
+			"con_save_total": -5.0,
+			"cp": 0.0,
+			"current_init": 0.0,
+			"deception_total": -5.0,
+			"dex": 0.0,
+			"dex_mod": -5.0,
+			"dex_save_total": -5.0,
+			"faction": "neutral",
+			"gp": 0.0,
+			"history_total": -5.0,
+			"hp": 20.0,
+			"init_bonus": -5.0,
+			"insight_total": -5.0,
+			"int": 0.0,
+			"int_mod": -5.0,
+			"int_save_total": -5.0,
+			"intimidation_total": -5.0,
+			"investigation_total": -5.0,
+			"is_dead": false,
+			"is_hidden": false,
+			"is_status_active": false,
+			"light_radius": 50.0,
+			"max_hp": 20.0,
+			"medicine_total": -5.0,
+			"menu_category": "NPCs",
+			"name": "Unknown",
+			"nature_total": -5.0,
+			"owner_id": "TEST2",
+			"perception_total": -5.0,
+			"performance_total": -5.0,
+			"persuasion_total": -5.0,
+			"prof_bonus": 0.0,
+			"religion_total": -5.0,
+			"sleight_of_hand_total": -5.0,
+			"sp": 0.0,
+			"speed": 0.0,
+			"status_color": "c45500b2",
+			"stealth_total": -5.0,
+			"str": 0.0,
+			"str_mod": -5.0,
+			"str_save_total": -5.0,
+			"survival_total": -5.0,
+			"wis": 0.0,
+			"wis_mod": -5.0,
+			"wis_save_total": -5.0
+		},
 		"Unknown": {
-			"art_path": "user://tokens/6662c45a04d674e152f8da8a-removebg-preview.png",
+			"art_path": "user://tokens/God Champions//Logik god champion.jpg",
 			"data": {
-				"current_init": 0.0,
+				"current_init": 0,
 				"faction": "neutral",
-				"hp": 20.0,
+				"hp": 20,
 				"is_dead": false,
 				"is_hidden": false,
 				"is_status_active": false,
-				"light_radius": 40.0,
-				"max_hp": 20.0,
+				"light_radius": 0.0,
+				"max_hp": 20,
 				"name": "Unknown",
 				"owner_id": "1",
 				"status_color": "c45500b2"
@@ -21,14 +80,18 @@
 			"height_offset": 0.0
 		}
 	},
-	"quests": [],
+	"quests": [
+		{
+			"title": "dsa"
+		}
+	],
 	"scenes": {
 		"default_map": {
-			"map_image_path": "user://maps/Encounters/VAMPIRE BATTLE.jpeg",
+			"map_image_path": "user://maps/Cities/AMADOR.jpg",
 			"map_scale": 1.0,
 			"tokens": [
 				{
-					"art_path": "user://tokens/6662c45a04d674e152f8da8a-removebg-preview.png",
+					"art_path": "",
 					"data": {
 						"current_init": 0.0,
 						"faction": "neutral",
@@ -36,21 +99,280 @@
 						"is_dead": false,
 						"is_hidden": false,
 						"is_status_active": false,
-						"light_radius": 40.0,
+						"light_radius": 0.0,
 						"max_hp": 20.0,
 						"name": "Unknown",
 						"owner_id": "1",
 						"status_color": "c45500b2"
 					},
 					"height_offset": 0.0,
-					"name": "Token_18901_515",
-					"x": 864.0,
+					"name": "Token",
+					"x": -193.0,
+					"y": 416.0
+				},
+				{
+					"art_path": "user://tokens/God Champions//Goddes of pleasure.jpg",
+					"data": {
+						"acrobatics_total": -5.0,
+						"animal_handling_total": -5.0,
+						"arcana_total": -5.0,
+						"armor_class": 0.0,
+						"athletics_total": -5.0,
+						"cha": 0.0,
+						"cha_mod": -5.0,
+						"cha_save_total": -5.0,
+						"con": 0.0,
+						"con_mod": -5.0,
+						"con_save_total": -5.0,
+						"cp": 0.0,
+						"current_init": 0.0,
+						"deception_total": -5.0,
+						"dex": 0.0,
+						"dex_mod": -5.0,
+						"dex_save_total": -5.0,
+						"faction": "neutral",
+						"gp": 0.0,
+						"history_total": -5.0,
+						"hp": 20,
+						"init_bonus": -5.0,
+						"insight_total": -5.0,
+						"int": 0.0,
+						"int_mod": -5.0,
+						"int_save_total": -5.0,
+						"intimidation_total": -5.0,
+						"investigation_total": -5.0,
+						"is_dead": false,
+						"is_hidden": false,
+						"is_status_active": false,
+						"light_radius": 50.0,
+						"max_hp": 20.0,
+						"medicine_total": -5.0,
+						"menu_category": "NPCs",
+						"name": "Unknown",
+						"nature_total": -5.0,
+						"owner_id": "TEST2",
+						"perception_total": -5.0,
+						"performance_total": -5.0,
+						"persuasion_total": -5.0,
+						"prof_bonus": 0.0,
+						"religion_total": -5.0,
+						"sleight_of_hand_total": -5.0,
+						"sp": 0.0,
+						"speed": 0.0,
+						"status_color": "c45500b2",
+						"stealth_total": -5.0,
+						"str": 0.0,
+						"str_mod": -5.0,
+						"str_save_total": -5.0,
+						"survival_total": -5.0,
+						"wis": 0.0,
+						"wis_mod": -5.0,
+						"wis_save_total": -5.0
+					},
+					"height_offset": 0.0,
+					"name": "Token_40934_722",
+					"x": 672.0,
+					"y": 416.0
+				},
+				{
+					"art_path": "user://tokens/God Champions//Logik god champion.jpg",
+					"data": {
+						"current_init": 0,
+						"faction": "neutral",
+						"hp": 20,
+						"is_dead": false,
+						"is_hidden": false,
+						"is_status_active": false,
+						"light_radius": 0.0,
+						"max_hp": 20,
+						"name": "Unknown",
+						"owner_id": "1",
+						"status_color": "c45500b2"
+					},
+					"height_offset": 0.0,
+					"name": "Token_124960_529",
+					"x": 544.0,
 					"y": 416.0
 				}
 			],
 			"walls": []
 		}
 	},
-	"sheet_template": {},
+	"sheet_template": {
+		"dice_logic": "d20_high",
+		"layout": [
+			{
+				"elements": [
+					{
+						"key": "portrait",
+						"label": "Appearance",
+						"type": "image"
+					},
+					{
+						"key": "name",
+						"label": "Character Name",
+						"type": "text"
+					},
+					{
+						"key": "class",
+						"label": "Class & Level",
+						"type": "text"
+					},
+					{
+						"id": "owner_id",
+						"label": "Assigned Player Name:",
+						"type": "text"
+					},
+					{
+						"key": "backstory",
+						"label": "Backstory",
+						"type": "long_text"
+					}
+				],
+				"tab": "Identity"
+			},
+			{
+				"elements": [
+					{
+						"stats": [
+							"STR",
+							"DEX",
+							"CON",
+							"INT",
+							"WIS",
+							"CHA"
+						],
+						"type": "stat_row"
+					},
+					{
+						"key": "prof_bonus",
+						"label": "Proficiency Bonus",
+						"type": "stat_box"
+					},
+					{
+						"key": "init_bonus",
+						"label": "Initiative Bonus",
+						"type": "stat_box"
+					},
+					{
+						"current_key": "hp",
+						"label": "Hit Points",
+						"max_key": "max_hp",
+						"type": "resource_bar"
+					},
+					{
+						"current_key": "temp_hp",
+						"label": "Temp HP",
+						"max_key": "temp_hp_max",
+						"type": "resource_bar"
+					},
+					{
+						"key": "armor_class",
+						"label": "Armor Class",
+						"type": "stat_box"
+					},
+					{
+						"key": "speed",
+						"label": "Speed",
+						"type": "stat_box"
+					},
+					{
+						"fail_key": "death_failures",
+						"label": "Death Saves",
+						"success_key": "death_successes",
+						"type": "death_saves"
+					}
+				],
+				"tab": "Core"
+			},
+			{
+				"elements": [
+					{
+						"label": "Saving Throws",
+						"skills": [
+							"STR Save",
+							"DEX Save",
+							"CON Save",
+							"INT Save",
+							"WIS Save",
+							"CHA Save"
+						],
+						"type": "skill_list"
+					},
+					{
+						"label": "Skills",
+						"skills": [
+							"Acrobatics",
+							"Animal Handling",
+							"Arcana",
+							"Athletics",
+							"Deception",
+							"History",
+							"Insight",
+							"Intimidation",
+							"Investigation",
+							"Medicine",
+							"Nature",
+							"Perception",
+							"Performance",
+							"Persuasion",
+							"Religion",
+							"Sleight of Hand",
+							"Stealth",
+							"Survival"
+						],
+						"type": "skill_list"
+					}
+				],
+				"tab": "Saves & Skills"
+			},
+			{
+				"elements": [
+					{
+						"key": "weapons_text",
+						"label": "Weapons & Attacks",
+						"type": "long_text"
+					},
+					{
+						"key": "inventory_text",
+						"label": "Equipment & Inventory",
+						"type": "long_text"
+					},
+					{
+						"key": "cp",
+						"label": "Copper",
+						"type": "stat_box"
+					},
+					{
+						"key": "sp",
+						"label": "Silver",
+						"type": "stat_box"
+					},
+					{
+						"key": "gp",
+						"label": "Gold",
+						"type": "stat_box"
+					}
+				],
+				"tab": "Combat & Gear"
+			},
+			{
+				"elements": [
+					{
+						"key": "features_text",
+						"label": "Features & Traits",
+						"type": "long_text"
+					},
+					{
+						"key": "bio_text",
+						"label": "Biography",
+						"type": "long_text"
+					}
+				],
+				"tab": "Notes"
+			}
+		],
+		"system_name": "D&D 5e"
+	},
 	"system_id": "dnd_5e"
 }

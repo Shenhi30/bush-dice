@@ -1,6 +1,7 @@
 [gd_scene format=3 uid="uid://dumt7s8nlqnjf"]
 
 [ext_resource type="Script" uid="uid://bxm3g1gt4ul3x" path="res://Scripts/MainMenu.gd" id="1_p8ccj"]
+[ext_resource type="Theme" uid="uid://d4megw80kf305" path="res://Themes/SpiBoxes/SpinBoxBG.tres" id="2_tk8dj"]
 
 [node name="MainMenu" type="Control" unique_id=777171733]
 layout_mode = 3
@@ -33,7 +34,9 @@ layout_mode = 2
 
 [node name="TitleLabel" type="Label" parent="CenterContainer/VBoxContainer" unique_id=1996377064]
 layout_mode = 2
+theme = ExtResource("2_tk8dj")
 text = "Bush Dice"
+horizontal_alignment = 1
 
 [node name="WelcomeLabel" type="Label" parent="CenterContainer/VBoxContainer" unique_id=659271694]
 layout_mode = 2
@@ -69,10 +72,14 @@ layout_mode = 2
 [node name="Label" type="Label" parent="CenterContainer/VBoxContainer" unique_id=2049829437]
 layout_mode = 2
 text = "Press x - change token to enemy/neutral/ally
+SHIFT + LMB to select multiple tokens
 Press + or - to change token size
+Press N to higlight next token name
+Press H to hide DELETE to delete Q to damage all selected
 
-1, 2, 3, 4 - to change tools for GM; 1, 4(ruller) work for player.
+ALT+LMB to Ping
 
+1, 2, 3, 4 - to change tools for GM; 1, 4(ruller) work for player. 
 "
 
 [node name="LoadCampaignDialog" type="FileDialog" parent="." unique_id=192650964]
@@ -92,5 +99,5 @@ offset_left = -40.0
 offset_top = -23.0
 grow_horizontal = 0
 grow_vertical = 0
-text = "version 0.28"
+text = "version 0.38"
 horizontal_alignment = 1

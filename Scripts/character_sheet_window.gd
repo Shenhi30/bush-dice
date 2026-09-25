@@ -7,6 +7,12 @@ extends PanelContainer # Or Window, depending on your root
 @onready var add_popup = $AddBlueprintPopup
 @onready var close_btn = $MarginContainer/VBoxContainer/HBoxContainer/CloseBtn
 
+@onready var gm_settings_row = $MarginContainer/VBoxContainer/GMSettingsRow
+@onready var gm_checkbox = $MarginContainer/VBoxContainer/GMSettingsRow/CMCheckBox
+@onready var category_dropdown = $MarginContainer/VBoxContainer/GMSettingsRow/CategoryDropdown
+
+var is_building_ui: bool = false
+
 # --- D&D STAT LINKING MAP ---
 var dnd_skill_map = {
 	"str_save": "str", "dex_save": "dex", "con_save": "con", "int_save": "int", "wis_save": "wis", "cha_save": "cha",
@@ -54,6 +60,40 @@ func _ready():
 	if GameState.is_gm_mode:
 		add_stat_btn.show()
 	
+	if gm_settings_row:
+		if GameState.is_gm_mode:
+			gm_settings_row.show() 
+			
+			
+			if gm_checkbox:
+				gm_checkbox.toggled.connect(func(pressed):
+					local_data["is_gm_only"] = pressed
+					save_sheet_to_token()
+				)
+				
+			if category_dropdown:
+				_populate_category_dropdown()
+				category_dropdown.item_selected.connect(func(index):
+					local_data["menu_category"] = category_dropdown.get_item_text(index)
+					save_sheet_to_token()
+				)
+		else:
+			gm_settings_row.hide()
+	
+	var auto_math_btn = CheckBox.new()
+	auto_math_btn.text = "Auto-Calculate Stats"
+	auto_math_btn.name = "AutoMathToggle"
+	
+	var top_bar = $MarginContainer/VBoxContainer/HBoxContainer
+	top_bar.add_child(auto_math_btn)
+	top_bar.move_child(auto_math_btn, save_btn.get_index()) # Ставимо перед кнопкою Save
+	
+	auto_math_btn.toggled.connect(func(pressed):
+		local_data["use_auto_math"] = pressed
+		if pressed: update_auto_math()
+		save_sheet_to_token()
+	)
+	
 	generate_ui(CampaignManager.campaign_data.get("sheet_template", {}), {})
 
 # --- DRAGGING LOGIC ---
@@ -69,6 +109,7 @@ func _on_title_gui_input(event: InputEvent):
 	elif event is InputEventMouseMotion and dragging:
 		global_position = get_global_mouse_position() - drag_offset
 
+
 # --- UI GENERATION ---
 
 func generate_ui(template: Dictionary, character_data: Dictionary, token_name: String = ""):
@@ -82,6 +123,31 @@ func generate_ui(template: Dictionary, character_data: Dictionary, token_name: S
 		current_token_name = token_name
 		local_data = character_data.duplicate() 
 		original_data = character_data.duplicate() 
+		
+		if gm_checkbox:
+			gm_checkbox.set_pressed_no_signal(local_data.get("is_gm_only", false))
+			
+			var auto_math_btn = get_node_or_null("MarginContainer/VBoxContainer/HBoxContainer/AutoMathToggle")
+			if auto_math_btn:
+				auto_math_btn.set_pressed_no_signal(local_data.get("use_auto_math", true))
+		
+	if category_dropdown and GameState.is_gm_mode:
+			var current_category = local_data.get("menu_category", "Party")
+			
+			local_data["menu_category"] = current_category
+			
+			var found_index = -1
+			
+			for i in range(category_dropdown.get_item_count()):
+				if category_dropdown.get_item_text(i) == current_category:
+					found_index = i
+					break
+					
+			if found_index != -1:
+				category_dropdown.select(found_index)
+			else:
+				# Fallback to Party if the data is missing or invalid
+				category_dropdown.select(0)
 
 	# Grab the dice logic for the active system
 	current_dice_logic = template.get("dice_logic", "d20_high")
@@ -161,7 +227,19 @@ func generate_ui(template: Dictionary, character_data: Dictionary, token_name: S
 				
 				# Auto-Save triggers for both boxes independently!
 				curr_box.value_changed.connect(func(val): 
+					# 1. Calculate the difference for floating text
+					var old_hp = int(local_data.get(curr_key, val))
+					var amount_changed = int(val) - old_hp
+					
+					# 2. Update local storage
 					local_data[curr_key] = val
+					
+					# 3. Trigger Universal Floating Text if HP actually moved
+					if amount_changed != 0 and curr_key in ["hp", "current_hp", "health"]:
+						var main_board = get_tree().current_scene
+						if main_board and main_board.has_method("broadcast_floating_text"):
+							main_board.broadcast_floating_text(current_token_name, amount_changed)
+							
 					save_sheet_to_token()
 				)
 				
@@ -259,7 +337,7 @@ func generate_ui(template: Dictionary, character_data: Dictionary, token_name: S
 					# If this skill is in the token's blacklist, skip it completely!
 					if local_data.get("deleted_skills", []).has(skill_id):
 						continue
-
+						
 					if item["type"] == "d100_skill_list":
 						var skill_row = HBoxContainer.new()
 						
@@ -314,6 +392,24 @@ func generate_ui(template: Dictionary, character_data: Dictionary, token_name: S
 						ui_nodes[skill_id] = skill_row
 						
 				continue
+				
+			elif item.get("type") == "spell_book":
+				
+				var spell_book_container = VBoxContainer.new()
+				spell_book_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				spell_book_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
+				spell_book_container.custom_minimum_size = Vector2(320, 600) # ПРИМУСОВИЙ РОЗМІР!
+				
+				var max_level = int(item.get("max_level", 9)) 
+				
+				# Додаємо контейнер на вкладку "Spells"
+				target_container.add_child(spell_book_container)
+				
+				# Малюємо інтерфейс
+				_draw_spell_book(spell_book_container, max_level)
+				
+				continue
+				
 			elif item["type"] == "death_saves":
 				new_row = death_saves_scene.instantiate()
 				
@@ -338,6 +434,8 @@ func generate_ui(template: Dictionary, character_data: Dictionary, token_name: S
 				ui_nodes[item_id] = new_row
 		
 	update_auto_math()
+	
+	is_building_ui = false
 
 # --- AUTO-MATH ENGINE ---
 
@@ -363,10 +461,16 @@ func _on_skill_value_edited(skill_key: String, new_text: String) -> void:
 		local_data[skill_key] = new_value
 		save_sheet_to_token() # Auto-Save!
 
+func _on_manual_override(value: float, data_key: String):
+	local_data[data_key] = value
+	save_sheet_to_token()
+
 func update_auto_math():
 	var template = CampaignManager.campaign_data.get("sheet_template", {})
 	var layout = template.get("layout", [])
 	
+	# Перевіряємо, чи ввімкнена математика! (За замовчуванням True)
+	var use_auto = local_data.get("use_auto_math", true) 
 	var prof_bonus = local_data.get("prof_bonus", 2) 
 	
 	for tab_data in layout:
@@ -381,23 +485,29 @@ func update_auto_math():
 					var row = ui_nodes[stat_id]
 					var score = local_data.get(stat_id, 10)
 					
-					var mod = floor((score - 10) / 2.0) 
-					local_data[stat_id + "_mod"] = mod 
-					
-					var sign_str = "+" if mod >= 0 else ""
-					if row.has_node("ModifierLabel"):
-						row.get_node("ModifierLabel").text = sign_str + str(mod)
+					# Якщо авто-математика увімкнена, перезаписуємо пам'ять. Якщо ні - залишаємо ручні зміни!
+					if use_auto:
+						local_data[stat_id + "_mod"] = floor((score - 10) / 2.0) 
 						
+					var mod = local_data.get(stat_id + "_mod", 0)
+					
+					if row.has_node("ModifierLabel"):
+						var mod_node = row.get_node("ModifierLabel")
+						if mod_node is SpinBox: # Якщо ви зробили його редагованим полем
+							mod_node.set_value_no_signal(mod)
+							if not mod_node.value_changed.is_connected(_on_manual_override):
+								mod_node.value_changed.connect(_on_manual_override.bind(stat_id + "_mod"))
+						elif mod_node is Label: # Якщо це просто текст
+							var sign_str = "+" if mod >= 0 else ""
+							mod_node.text = sign_str + str(mod)
+							
 					# Auto-Initiative Link
 					if stat_id == "dex":
-						local_data["init_bonus"] = mod
-						if ui_nodes.has("init_bonus"):
-							var init_row = ui_nodes["init_bonus"]
-							if init_row.has_node("BaseValue"):
-								init_row.get_node("BaseValue").set_value_no_signal(mod)
-								
-				continue 
-				
+						if use_auto: local_data["init_bonus"] = mod
+						if ui_nodes.has("init_bonus") and ui_nodes["init_bonus"].has_node("BaseValue"):
+							var init_box = ui_nodes["init_bonus"].get_node("BaseValue")
+							init_box.set_value_no_signal(local_data.get("init_bonus", mod))
+							
 			# --- 2. UNPACKED SKILL LISTS ---
 			elif item.get("type") in ["skill_list", "d100_skill_list"] and current_dice_logic == "d20_high":
 				for skill_name in item.get("skills", []):
@@ -405,56 +515,63 @@ func update_auto_math():
 					if not ui_nodes.has(skill_id): continue
 					var row = ui_nodes[skill_id]
 					
-					var linked_stat = dnd_skill_map.get(skill_id, "dex") 
-					var stat_mod = local_data.get(linked_stat + "_mod", 0)
-					var is_prof = local_data.get(skill_id + "_prof", false)
-					var is_expert = local_data.get(skill_id + "_exp", false)
-					
-					var total = stat_mod
-					
-					if is_expert: total += (prof_bonus * 2)
-					elif is_prof: total += prof_bonus
-					
-					local_data[skill_id + "_total"] = total
-					if row.has_node("TotalValue"):
-						row.get_node("TotalValue").set_value_no_signal(total)
+					if use_auto:
+						var linked_stat = dnd_skill_map.get(skill_id, "dex") 
+						var stat_mod = local_data.get(linked_stat + "_mod", 0)
+						var is_prof = local_data.get(skill_id + "_prof", false)
+						var is_expert = local_data.get(skill_id + "_exp", false)
 						
-				continue 
+						var total = stat_mod
+						if is_expert: total += (prof_bonus * 2)
+						elif is_prof: total += prof_bonus
+						local_data[skill_id + "_total"] = total
+					
+					# Застосовуємо значення до UI і дозволяємо ручне збереження
+					if row.has_node("TotalValue"):
+						var total_box = row.get_node("TotalValue")
+						total_box.set_value_no_signal(local_data.get(skill_id + "_total", 0))
+						if not total_box.value_changed.is_connected(_on_manual_override):
+							total_box.value_changed.connect(_on_manual_override.bind(skill_id + "_total"))
 
 			# --- 3. SINGLE ELEMENTS ---
 			var item_id = item.get("key", item.get("id", "unknown"))
-			
 			if not ui_nodes.has(item_id): continue
 			var row = ui_nodes[item_id]
 			
 			if item.get("auto_math") == "dnd_modifier":
-				var score = local_data.get(item_id, 10)
-				var mod = floor((score - 10) / 2.0) 
-				local_data[item_id + "_mod"] = mod 
-				var sign_str = "+" if mod >= 0 else ""
+				if use_auto:
+					var score = local_data.get(item_id, 10)
+					local_data[item_id + "_mod"] = floor((score - 10) / 2.0) 
+					
+				var mod = local_data.get(item_id + "_mod", 0)
 				if row.has_node("ModifierLabel"):
-					row.get_node("ModifierLabel").text = sign_str + str(mod)
+					var mod_node = row.get_node("ModifierLabel")
+					if mod_node is SpinBox:
+						mod_node.set_value_no_signal(mod)
+						if not mod_node.value_changed.is_connected(_on_manual_override):
+							mod_node.value_changed.connect(_on_manual_override.bind(item_id + "_mod"))
+					elif mod_node is Label:
+						var sign_str = "+" if mod >= 0 else ""
+						mod_node.text = sign_str + str(mod)
 
 			elif item.get("auto_math") == "dnd_skill":
-				var linked_stat = item.get("linked_stat", "")
-				var stat_mod = local_data.get(linked_stat + "_mod", 0)
-				var is_prof = local_data.get(item_id + "_prof", false)
-				var is_expert = local_data.get(item_id + "_exp", false)
-				
-				var total = stat_mod
-				if is_expert: total += (prof_bonus * 2)
-				elif is_prof: total += prof_bonus
-				
-				local_data[item_id + "_total"] = total
+				if use_auto:
+					var linked_stat = item.get("linked_stat", "")
+					var stat_mod = local_data.get(linked_stat + "_mod", 0)
+					var is_prof = local_data.get(item_id + "_prof", false)
+					var is_expert = local_data.get(item_id + "_exp", false)
+					
+					var total = stat_mod
+					if is_expert: total += (prof_bonus * 2)
+					elif is_prof: total += prof_bonus
+					local_data[item_id + "_total"] = total
+					
 				if row.has_node("TotalValue"):
-					row.get_node("TotalValue").set_value_no_signal(total)
+					var total_box = row.get_node("TotalValue")
+					total_box.set_value_no_signal(local_data.get(item_id + "_total", 0))
+					if not total_box.value_changed.is_connected(_on_manual_override):
+						total_box.value_changed.connect(_on_manual_override.bind(item_id + "_total"))
 
-			elif item.get("auto_math") == "dnd_initiative":
-				var linked_stat = item.get("linked_stat", "dex")
-				var dex_mod = local_data.get(linked_stat + "_mod", 0)
-				local_data[item_id] = dex_mod
-				if row.has_node("BaseValue"):
-					row.get_node("BaseValue").set_value_no_signal(dex_mod)
 
 func _on_gm_delete_pressed(stat_id: String):
 	if not GameState.is_gm_mode: return
@@ -506,6 +623,15 @@ func _delete_skill(skill_id: String, row_node: Node):
 	# 5. Tell the server we updated our sheet!
 	save_sheet_to_token()
 
+func _populate_category_dropdown():
+	category_dropdown.clear()
+	
+	# Only list the exact menus you have built in your GM Dashboard ToolPallete
+	var target_menus = ["Party", "Monsters", "NPCs"]
+	
+	for menu in target_menus:
+		category_dropdown.add_item(menu)
+
 
 # --- POPUP HANDLING ---
 
@@ -516,6 +642,10 @@ func _on_add_stat_btn_pressed():
 
 # --- PERSISTENT SAVE TO TOKEN BRAIN ---
 func save_sheet_to_token():
+	
+	if is_building_ui: 
+		return
+
 	update_auto_math() # Ensure math is fresh before checking differences
 	
 	var main_board = get_tree().current_scene
@@ -527,3 +657,257 @@ func save_sheet_to_token():
 				
 		original_data = local_data.duplicate(true)
 		print("Character Sheet modifications saved to network token: ", current_token_name)
+		
+	if GameState.is_gm_mode:
+			if not CampaignManager.campaign_data.has("pc_vault"):
+				CampaignManager.campaign_data["pc_vault"] = {}
+				
+			# 1. Grab whatever text is currently inside the input fields
+			var c_name = str(local_data.get("name", "")).strip_edges()
+			var p_name = str(local_data.get("player_name", "")).strip_edges() 
+			
+			# 2. Decide the best key: Character Name -> Player Name -> Image Filename -> Raw Token ID
+			var vault_key = ""
+			
+			if c_name != "" and c_name.to_lower() != "unknown":
+				vault_key = c_name
+			elif p_name != "":
+				vault_key = p_name
+			elif local_data.has("art_path") and local_data["art_path"] != "":
+				# Fallback to the clean image file name (e.g., "bounty_hunter") instead of "Token_40934"
+				vault_key = local_data["art_path"].get_file().get_basename()
+			else:
+				vault_key = current_token_name
+				
+			# 3. Clean up the old garbage Token ID from the vault if it was stored under that previously
+			if vault_key != current_token_name and CampaignManager.campaign_data["pc_vault"].has(current_token_name):
+				CampaignManager.campaign_data["pc_vault"].erase(current_token_name)
+				
+			# 4. Save into the Vault permanently under the clean name!
+			CampaignManager.campaign_data["pc_vault"][vault_key] = local_data.duplicate(true)
+			
+			# 5. Refresh Dashboard menus
+			var dashboard = get_tree().root.find_child("GMDashboard", true, false)
+			if dashboard and dashboard.has_method("refresh_toolpallete_lists"):
+				dashboard.refresh_toolpallete_lists()
+
+# ==========================================
+# SPELL BOOK SYSTEM
+# ==========================================
+
+func _draw_spell_book(container: Control, max_level: int):
+	for child in container.get_children():
+		child.queue_free()
+		
+		
+	# 1. БЕЗПЕЧНЕ завантаження словника заклинань
+	var spells_data = local_data.get("spells", {})
+	if typeof(spells_data) != TYPE_DICTIONARY:
+		spells_data = {}
+		local_data["spells"] = spells_data
+		
+	for level in range(max_level + 1):
+		var level_str = str(level)
+		
+		# 2. БЕЗПЕЧНЕ завантаження масиву рівня
+		var level_list = spells_data.get(level_str, [])
+		if typeof(level_list) != TYPE_ARRAY:
+			level_list = []
+			spells_data[level_str] = level_list
+			
+		var level_box = VBoxContainer.new()
+		
+		# --- ЗАГОЛОВОК ТА КНОПКА ДОДАВАННЯ ---
+		var header = HBoxContainer.new()
+		var title = Label.new()
+		title.text = "Cantrips (Level 0)" if level == 0 else "Level " + str(level)
+		title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		title.add_theme_color_override("font_color", Color(0.6, 0.8, 1.0))
+		
+		var add_btn = Button.new()
+		add_btn.text = "+ Add Spell"
+		add_btn.pressed.connect(_on_add_spell_pressed.bind(container, max_level, level_str))
+		
+		header.add_child(title)
+		header.add_child(add_btn)
+		level_box.add_child(header)
+		
+		# --- СПИСОК ЗАКЛИНАНЬ (З КУБИКАМИ) ---
+		for i in range(level_list.size()):
+			var spell = level_list[i]
+			if typeof(spell) != TYPE_DICTIONARY: continue
+			
+			var spell_row = HBoxContainer.new()
+			
+			# 1. Назва
+			var name_input = LineEdit.new()
+			name_input.text = spell.get("name", "")
+			name_input.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			name_input.placeholder_text = "Spell Name"
+			name_input.text_changed.connect(_on_spell_text_changed.bind("name", level_str, i))
+			name_input.focus_exited.connect(save_sheet_to_token)
+			spell_row.add_child(name_input)
+			
+			# 2. Кількість Кубиків
+			var count_spin = SpinBox.new()
+			count_spin.min_value = 0
+			count_spin.max_value = 99
+			count_spin.value = spell.get("dice_count", 0)
+			count_spin.custom_minimum_size.x = 55
+			count_spin.alignment = HORIZONTAL_ALIGNMENT_CENTER
+			count_spin.value_changed.connect(_on_spell_number_changed.bind("dice_count", level_str, i))
+			spell_row.add_child(count_spin)
+			
+			var d_label = Label.new()
+			d_label.text = "d"
+			d_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			spell_row.add_child(d_label)
+			
+			# 3. Грані Кубика
+			var sides_spin = SpinBox.new()
+			sides_spin.min_value = 0
+			sides_spin.max_value = 100
+			sides_spin.value = spell.get("dice_sides", 0)
+			sides_spin.custom_minimum_size.x = 55
+			sides_spin.alignment = HORIZONTAL_ALIGNMENT_CENTER
+			sides_spin.value_changed.connect(_on_spell_number_changed.bind("dice_sides", level_str, i))
+			spell_row.add_child(sides_spin)
+			
+			# 4. Кнопки: Кидок (🎲), Опис (📝), Видалити (X)
+			var roll_btn = Button.new()
+			roll_btn.text = "🎲Roll"
+			roll_btn.pressed.connect(func(): _on_spell_roll_pressed(name_input.text, count_spin.value, sides_spin.value))
+			spell_row.add_child(roll_btn)
+			
+			var desc_btn = Button.new()
+			desc_btn.text = "📝Desc"
+			desc_btn.pressed.connect(_on_desc_btn_pressed.bind(level_str, i, name_input.text, spell.get("desc", "")))
+			spell_row.add_child(desc_btn)
+			
+			var del_btn = Button.new()
+			del_btn.text = "X"
+			del_btn.add_theme_color_override("font_color", Color(0.9, 0.2, 0.2))
+			del_btn.pressed.connect(_on_delete_spell_pressed.bind(container, max_level, level_str, i))
+			spell_row.add_child(del_btn)
+			
+			level_box.add_child(spell_row)
+			
+		level_box.add_child(HSeparator.new())
+		container.add_child(level_box)
+
+
+func _on_spell_number_changed(value: float, key: String, level_str: String, index: int):
+	var spells_dict = local_data.get("spells", {})
+	if typeof(spells_dict) != TYPE_DICTIONARY: return
+		
+	var spell_list = spells_dict.get(level_str, [])
+	if typeof(spell_list) != TYPE_ARRAY: return
+		
+	if index < spell_list.size():
+		if typeof(spell_list[index]) == TYPE_DICTIONARY:
+			# Save the SpinBox number to memory
+			spell_list[index][key] = int(value)
+			spells_dict[level_str] = spell_list
+			local_data["spells"] = spells_dict
+			save_sheet_to_token()
+
+func _on_desc_btn_pressed(level_str: String, index: int, spell_name: String, current_desc: String):
+	# Create a floating popup window entirely through code!
+	var dialog = AcceptDialog.new()
+	var display_name = spell_name if spell_name != "" else "Spell"
+	dialog.title = display_name + " Description"
+	
+	var text_edit = TextEdit.new()
+	text_edit.text = current_desc
+	text_edit.custom_minimum_size = Vector2(400, 300)
+	text_edit.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
+	
+	dialog.add_child(text_edit)
+	add_child(dialog) # Add to the Character Sheet
+	
+	# When the user clicks "OK", save the text and destroy the popup
+	dialog.confirmed.connect(func():
+		_on_spell_text_changed(text_edit.text, "desc", level_str, index)
+		save_sheet_to_token()
+		dialog.queue_free()
+	)
+	
+	# If they press "X" or "Cancel", just close it without saving
+	dialog.canceled.connect(func(): dialog.queue_free())
+	
+	dialog.popup_centered()
+
+func _on_spell_roll_pressed(spell_name: String, count: int, sides: int):
+	# Don't try to roll 0d0
+	if count <= 0 or sides <= 0: return 
+	
+	# 1. Do the Math!
+	var total = 0
+	var rolls = []
+	for i in range(count):
+		var r = randi_range(1, sides)
+		rolls.append(r)
+		total += r
+		
+	# 2. Format a beautiful message for the chat
+	var display_name = spell_name if spell_name != "" else "Unknown Spell"
+	var msg = "\n%s casts [b]%s[/b]!\nEffect: [color=yellow]%sd%s %s = %s[/color]" % [current_token_name, display_name, count, sides, str(rolls), total]
+	
+	# 3. Route it directly to the MainBoard chat network
+	var main = get_tree().current_scene
+	var my_name = GameState.player_name
+	var color = "#ffd700" if GameState.is_gm_mode else "#99ccff"
+	
+	if main.has_method("receive_chat_message"):
+		if multiplayer.is_server():
+			main.receive_chat_message(my_name, msg, color)
+			main.rpc("receive_chat_message", my_name, msg, color)
+		else:
+			main.rpc_id(1, "request_chat_message", my_name, msg, color)
+
+func _on_add_spell_pressed(container: Control, max_level: int, level_str: String):
+	var spells_dict = local_data.get("spells", {})
+	if typeof(spells_dict) != TYPE_DICTIONARY: spells_dict = {}
+		
+	var spell_list = spells_dict.get(level_str, [])
+	if typeof(spell_list) != TYPE_ARRAY: spell_list = []
+		
+	# Added dice default stats here!
+	spell_list.append({"name": "", "desc": "", "dice_count": 0, "dice_sides": 0})
+	
+	spells_dict[level_str] = spell_list
+	local_data["spells"] = spells_dict
+	
+	save_sheet_to_token()
+	_draw_spell_book(container, max_level)
+
+func _on_delete_spell_pressed(container: Control, max_level: int, level_str: String, index: int):
+	var spells_dict = local_data.get("spells", {})
+	if typeof(spells_dict) != TYPE_DICTIONARY: return
+		
+	var spell_list = spells_dict.get(level_str, [])
+	if typeof(spell_list) != TYPE_ARRAY: return
+		
+	if index < spell_list.size():
+		spell_list.remove_at(index)
+		spells_dict[level_str] = spell_list
+		local_data["spells"] = spells_dict
+		
+		save_sheet_to_token()
+		_draw_spell_book(container, max_level)
+
+func _on_spell_text_changed(new_text: String, key: String, level_str: String, index: int):
+	var spells_dict = local_data.get("spells", {})
+	if typeof(spells_dict) != TYPE_DICTIONARY: return
+		
+	var spell_list = spells_dict.get(level_str, [])
+	if typeof(spell_list) != TYPE_ARRAY: return
+		
+	if index < spell_list.size():
+		if typeof(spell_list[index]) == TYPE_DICTIONARY:
+			spell_list[index][key] = new_text
+			spells_dict[level_str] = spell_list
+			local_data["spells"] = spells_dict
+
+#=========================================
+#=========================================

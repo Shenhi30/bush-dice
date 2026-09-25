@@ -25,8 +25,19 @@ signal spawn_party_requested
 @onready var token_file_dialog = $TokenFileDialog
 @onready var enemy_checkbox = $HBoxContainer/EnemyCheckBox
 
+@onready var token_search_bar: LineEdit = $TokenDrawer/VBoxContainer/TopControls/TokenSearchBar
+
+@onready var host_ip_btn = $HBoxContainer/HostIPBtn
+
 #  -- Dropdown --
-@onready var scene_dropdown = $HBoxContainer/SceneDropdown
+@onready var scene_select_btn = $HBoxContainer/SceneSelectBtn
+@onready var scene_popup = $HBoxContainer/SceneSelectBtn/ScenePopup
+@onready var search_bar = $HBoxContainer/SceneSelectBtn/ScenePopup/VBoxContainer/SearchBar
+@onready var scene_tree = $HBoxContainer/SceneSelectBtn/ScenePopup/VBoxContainer/SceneTree
+
+# We store the raw data here so the search bar can instantly rebuild the list
+var full_scene_list = {}
+
 @onready var add_scene_btn = $HBoxContainer/AddSceneBtn
 
 @onready var spawn_party_btn = $ToolPallete/TabContainer/Party/SpawnPartyBtn
@@ -35,6 +46,8 @@ signal spawn_party_requested
 @onready var system_dropdown = $ToolPallete/TabContainer/Tools/SystemDropdown
 
 @onready var party_list = $ToolPallete/TabContainer/Party/PartyList
+@onready var monster_list = $ToolPallete/TabContainer/Monsters/MonsterList
+@onready var npc_list = $ToolPallete/TabContainer/NPCs/NPCList
 
 @onready var shape_dropdown = $ToolPallete/TabContainer/Tools/MeasureShapeDropdown
 # -- RENAME --
@@ -44,6 +57,7 @@ signal spawn_party_requested
 
 # --- TOOL BUTTONS ---
 # Double-check these paths exactly match the names of your buttons in the scene tree!
+@onready var floating_text_toggle = $ToolPallete/TabContainer/Tools/FloatingTextToggle
 @onready var btn_select = $ToolPallete/TabContainer/Tools/SelectToolBtn
 @onready var btn_draw = $ToolPallete/TabContainer/Tools/WallToolBtn
 @onready var btn_erase = $ToolPallete/TabContainer/Tools/EraseWallBtn
@@ -77,25 +91,45 @@ func _ready():
 	var token_import = $TokenDrawer/VBoxContainer/TopControls/ImportTokenBtn
 	var token_close = $TokenDrawer/VBoxContainer/TopControls/CloseTokenBtn
 	
+	if token_search_bar:
+		token_search_bar.text_changed.connect(func(_new_text: String):
+			refresh_token_library()
+		)
+	
 	map_import.pressed.connect(func(): map_file_dialog.popup_centered_ratio(0.7))
 	token_import.pressed.connect(func(): token_file_dialog.popup_centered_ratio(0.7))
 	
 	# The new Close Buttons!
 	map_close.pressed.connect(func(): map_drawer.hide())
 	token_close.pressed.connect(func(): token_drawer.hide())
-	# 3. When a file is chosen, turn it into a button in the drawer!
 	
-	
-	# 4. Auto-generate the default folders on startup
 	
 	$HBoxContainer/SaveCampaignBtn.pressed.connect(func(): save_file_dialog.popup_centered_ratio(0.7))
 	$HBoxContainer/LoadCampaignBtn.pressed.connect(func(): load_file_dialog.popup_centered_ratio(0.7))
 	
-	save_file_dialog.file_selected.connect(func(path): save_requested.emit(path))
-	load_file_dialog.file_selected.connect(func(path): load_requested.emit(path))
+# 1. Wire the File Dialogs to update the Campaign Manager AND tell the Board to render!
+	save_file_dialog.file_selected.connect(func(path): 
+		CampaignManager.save_campaign(path)
+		save_requested.emit(path) # Restored for the Main Board!
+	)
+	
+	load_file_dialog.file_selected.connect(func(path): 
+		CampaignManager.load_campaign(path)
+		load_requested.emit(path) # Restored for the Main Board!
+	)
+	
+	# 2. Tell the UI to rebuild the Side Menus whenever a save file finishes loading!
+	CampaignManager.campaign_loaded.connect(refresh_toolpallete_lists)
+	
+	# 3. Also rebuild the Map/Scene dropdown list!
+	CampaignManager.campaign_loaded.connect(refresh_scene_dropdown)
+	
+	# 3. Also rebuild the Map/Scene dropdown list!
+	CampaignManager.campaign_loaded.connect(refresh_scene_dropdown)
+	
 	spawn_party_btn.pressed.connect(func(): spawn_party_requested.emit())
 	
-	refresh_party_ui()
+	refresh_toolpallete_lists()
 	refresh_token_library()
 	refresh_map_library()
 	
@@ -103,14 +137,44 @@ func _ready():
 	# 1. Fill the dropdown with scenes from the CampaignManager
 	refresh_scene_dropdown()
 	# 2. Wire the buttons
-	scene_dropdown.item_selected.connect(_on_scene_dropdown_selected)
+	
+	# 1. Pop open the menu perfectly below the button
+	scene_select_btn.pressed.connect(func():
+		# Get the button's exact coordinates on the screen
+		var btn_rect = scene_select_btn.get_global_rect()
+		
+		# Move the popup to sit exactly at the bottom-left corner of the button
+		scene_popup.position = Vector2i(btn_rect.position.x, btn_rect.position.y + btn_rect.size.y)
+		scene_popup.size = Vector2i(250, 400)
+		
+		# Open it!
+		scene_popup.popup()
+		search_bar.grab_focus() # Automatically puts your text cursor in the search box!
+	)
+	
+	
+	# 2. Wire the search bar and the tree clicks
+	search_bar.text_changed.connect(_build_tree)
+	scene_tree.item_activated.connect(_on_scene_tree_item_activated)
+	
 	add_scene_btn.pressed.connect(func(): create_new_scene_requested.emit())
+	
+	if floating_text_toggle:
+		# Match the checkbox visual to the actual game state on load
+		floating_text_toggle.button_pressed = GameState.show_floating_text
+		
+		# Flip the master switch whenever the GM clicks the box!
+		floating_text_toggle.toggled.connect(func(is_on): GameState.show_floating_text = is_on)
 	
 	
 	# --- RENAME LOGIC ---
 	rename_btn.pressed.connect(func():
-		# Pre-fill the input box with the current scene's name
-		rename_input.text = scene_dropdown.get_item_text(scene_dropdown.selected)
+		# Pre-fill the input box with the current scene's name using the NEW button!
+		var current_name = scene_select_btn.text
+		if current_name == "Select Map...":
+			current_name = "" # Keep it blank if no map is loaded yet
+			
+		rename_input.text = current_name
 		rename_dialog.popup_centered()
 	)
 	
@@ -120,6 +184,7 @@ func _ready():
 			rename_scene_requested.emit(new_name)
 	)
 	
+
 	# --- SYSTEM DROPDOWN SETUP ---
 	system_dropdown.clear()
 	for system_id in SheetTemplates.TEMPLATES.keys():
@@ -135,6 +200,17 @@ func _ready():
 		system_dropdown.select(tab_index)
 		
 	shape_dropdown.item_selected.connect(func(index): measure_shape_changed.emit(index))
+	# --- UPNP IP DISPLAY ---
+	if multiplayer.is_server():
+		host_ip_btn.visible = true
+		host_ip_btn.disabled = true # Lock it until UPnP finishes
+		
+		# Listen for the signal from NetworkManager
+		NetworkManager.upnp_completed.connect(_on_upnp_completed)
+		host_ip_btn.pressed.connect(_on_host_ip_btn_pressed)
+	else:
+		# Hide it if a regular player somehow sees this dashboard
+		host_ip_btn.visible = false
 
 
 func _process(delta: float):
@@ -187,56 +263,107 @@ func _create_image_button(image_path: String, grid: GridContainer, is_map: bool)
 	grid.add_child(btn)
 
 func refresh_token_library():
-	# 1. Clear the old icons
 	for child in token_grid.get_children():
 		child.queue_free()
+		
+	var base_path = "user://tokens/"
+	var dir = DirAccess.open(base_path)
+	if not dir: return
 	
-	# 2. Open the user folder
-	var path = "user://tokens/"
-	var dir = DirAccess.open(path)
-	if dir:
-		dir.list_dir_begin()
-		var file_name = dir.get_next()
-		if file_name == "":
-			print("The scanner found NOTHING in " + path)
-		while file_name != "":
-			print("Scanner found file: " + file_name) # This tells you it's working!
-			# 3. Only pick image files
-			if file_name.to_lower().ends_with(".png") or file_name.to_lower().ends_with(".jpg"):
-				spawn_library_icon(path + file_name)
+	# 1. Automatically generate standard folders to keep the GM organized
+	var default_groups = ["Monsters", "NPCs", "Players", "Props", "Uncategorized"]
+	for group in default_groups:
+		if not dir.dir_exists(group):
+			dir.make_dir(group)
 			
-			file_name = dir.get_next()
-	else:
-		print("Error: Could not find user://tokens folder!")
-
-func spawn_library_icon(file_path: String):
+	# Get current search filter
+	var filter_text = ""
+	if token_search_bar:
+		filter_text = token_search_bar.text.to_lower()
+			
+	var directories = dir.get_directories()
+	directories.sort() 
 	
-	# 4. Use your new UI template
+	# 2. Build groups for EVERY subfolder it finds
+	for d in directories:
+		_build_token_group(base_path + d + "/", d, filter_text)
+		
+	# Add a bumper at the bottom of the list for the scrollbar
+	var bottom_padding = Control.new()
+	bottom_padding.custom_minimum_size = Vector2(0, 45)
+	token_grid.add_child(bottom_padding)
+
+
+func _build_token_group(folder_path: String, group_name: String, filter_text: String):
+	var dir = DirAccess.open(folder_path)
+	if not dir: return
+	
+	var valid_files = []
+	dir.list_dir_begin()
+	var file_name = dir.get_next()
+	
+	while file_name != "":
+		var ext = file_name.to_lower()
+		if not dir.current_is_dir() and (ext.ends_with(".png") or ext.ends_with(".jpg") or ext.ends_with(".webp")):
+			if filter_text == "" or filter_text in file_name.to_lower():
+				valid_files.append(file_name)
+		file_name = dir.get_next()
+	
+	if valid_files.is_empty():
+		return
+		
+	if token_grid.get_child_count() > 0:
+		var gap = Control.new()
+		gap.custom_minimum_size = Vector2(0, 15)
+		token_grid.add_child(gap)
+	
+	var header = Label.new()
+	header.text = "-- " + group_name.to_upper() + " --"
+	header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	header.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
+	token_grid.add_child(header)
+	
+	# THE FIX: Create a dedicated grid just for this specific folder
+	var category_grid = GridContainer.new()
+	category_grid.columns = 4 # Set how many tokens wide you want the drawer to be
+	category_grid.add_theme_constant_override("h_separation", 10)
+	category_grid.add_theme_constant_override("v_separation", 15)
+	token_grid.add_child(category_grid)
+	
+	for f in valid_files:
+		spawn_library_icon(folder_path + "/" + f, category_grid) # Pass the new grid!
+
+
+func spawn_library_icon(file_path: String, target_grid: GridContainer):
 	var icon_scene = preload("res://UI/TokenLibraryItem.tscn")
 	var new_item = icon_scene.instantiate()
 	
-	# 1. Load the raw data from the hard drive
 	var img = Image.load_from_file(file_path)
+	if img:
+		var tex = ImageTexture.create_from_image(img)
+		var icon_node = new_item.get_node("Icon")
+		icon_node.texture = tex
+		icon_node.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon_node.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		
+		# Lock the token image size so tall images don't break the grid!
+		icon_node.custom_minimum_size = Vector2(80, 80) 
+		icon_node.size = Vector2(80, 80)
 	
-	# 2. Convert it into a texture the UI can use
-	var tex = ImageTexture.create_from_image(img)
-	
-	# 1. Set the image on the Icon node
-	var icon_node = new_item.get_node("Icon")
-	icon_node.texture = tex
-	icon_node.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	icon_node.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	icon_node.custom_minimum_size = Vector2(80, 80)
-	
-	# 2. Set the Name Label! 
-	# get_basename() removes the ".png" so "Guard.png" becomes "Guard"
 	var file_name = file_path.get_file().get_basename() 
 	var label_node = new_item.get_node("NameLabel")
 	label_node.text = file_name
 	label_node.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	
+	# Clip long names so they don't overlap neighboring tokens
+	label_node.clip_text = true
+	label_node.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	
 	new_item.token_image_path = file_path
-	token_grid.add_child(new_item)
+	new_item.token_image_path = file_path
+	
+	target_grid.add_child(new_item)
+
 
 func refresh_map_library():
 	for child in map_grid.get_children():
@@ -252,15 +379,17 @@ func refresh_map_library():
 		if not dir.dir_exists(group):
 			dir.make_dir(group)
 			
-	# 2. Build groups for EVERY subfolder it finds (including your Uncategorized folder!)
+	# 2. Build groups for EVERY subfolder it finds
 	var directories = dir.get_directories()
-	
-	# Optional: Sort them alphabetically so they look nice
 	directories.sort() 
 	
 	for d in directories:
-		# This will build a UI group for Dungeons, Encounters, Uncategorized, World, etc.
 		_build_map_group(base_path + d + "/", d, map_grid)
+		
+	# THE FIX 2: Add a 45px empty bumper at the bottom of the list so the scrollbar clears the text
+	var bottom_padding = Control.new()
+	bottom_padding.custom_minimum_size = Vector2(0, 45)
+	map_grid.add_child(bottom_padding)
 
 # --- NEW HELPER FUNCTION ---
 func _build_map_group(folder_path: String, group_name: String, parent_node: Node):
@@ -277,6 +406,16 @@ func _build_map_group(folder_path: String, group_name: String, parent_node: Node
 			valid_files.append(file_name)
 		file_name = dir.get_next()
 	
+	# Skip completely if the folder is empty (stops floating headers)
+	if valid_files.is_empty():
+		return
+		
+	# THE FIX 1: Add a 25px gap before the category header so it doesn't touch the maps above it
+	if parent_node.get_child_count() > 0:
+		var gap = Control.new()
+		gap.custom_minimum_size = Vector2(0, 25)
+		parent_node.add_child(gap)
+	
 	# Create a visual Header for the category
 	var header = Label.new()
 	header.text = "=== " + group_name.to_upper() + " ==="
@@ -284,18 +423,14 @@ func _build_map_group(folder_path: String, group_name: String, parent_node: Node
 	header.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8))
 	parent_node.add_child(header)
 	
-	# If empty, show a small label instead of a grid
-	if valid_files.is_empty():
-		var empty_label = Label.new()
-		empty_label.text = "(No maps in this folder)"
-		empty_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		empty_label.add_theme_color_override("font_color", Color(0.4, 0.4, 0.4))
-		parent_node.add_child(empty_label)
-		return
-	
 	# Create a Grid specifically for this category's maps
 	var grid = GridContainer.new()
-	grid.columns = 4
+	grid.columns = 2
+	
+	# Space between the rows and columns
+	grid.add_theme_constant_override("v_separation", 25)
+	grid.add_theme_constant_override("h_separation", 10)
+	
 	parent_node.add_child(grid)
 	
 	# Spawn the map icons directly into this grid
@@ -309,56 +444,38 @@ func spawn_map_icon(file_path: String, target_grid: GridContainer):
 	var new_icon = icon_scene.instantiate()
 	
 	var img = Image.load_from_file(file_path)
-	new_icon.texture = ImageTexture.create_from_image(img)
+	if img:
+		new_icon.texture = ImageTexture.create_from_image(img)
 	
 	new_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	new_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	new_icon.custom_minimum_size = Vector2(150, 100) 
 	
 	new_icon.map_image_path = file_path
+	
+	# --- THE NEW LABEL LOGIC ---
+	var name_label = Label.new()
+	name_label.text = file_path.get_file().get_basename() 
+	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	
+	# THE FIX: Stop long names from breaking the grid layout!
+	name_label.clip_text = true
+	name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	
+	# Pin the label perfectly to the bottom edge
+	name_label.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	
+	# Background for readability
+	var dark_bg = StyleBoxFlat.new()
+	dark_bg.bg_color = Color(0, 0, 0, 0.7) 
+	name_label.add_theme_stylebox_override("normal", dark_bg)
+	
+	new_icon.add_child(name_label)
+	# ---------------------------
+	
 	target_grid.add_child(new_icon)
 
-func refresh_party_ui():
-	# 1. Clear the old list
-	if not party_list: return
-	for child in party_list.get_children():
-		child.queue_free()
-		
-	var vault = CampaignManager.campaign_data.get("pc_vault", {})
-	
-	# 2. Build a row for every player character
-	for pc_name in vault.keys():
-		var pc_data = vault[pc_name]
-		var row = HBoxContainer.new()
-		
-		# A. The Portrait
-		var portrait = TextureRect.new()
-		var img = Image.load_from_file(pc_data["art_path"])
-		if img:
-			portrait.texture = ImageTexture.create_from_image(img)
-		portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		portrait.custom_minimum_size = Vector2(40, 40) # Small UI size
-		portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		row.add_child(portrait)
-		
-		# B. The Name Label
-		var name_lbl = Label.new()
-		name_lbl.text = pc_name
-		name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL # Pushes the spawn button to the right
-		row.add_child(name_lbl)
-		
-		# C. The Individual Spawn Button
-		var spawn_btn = Button.new()
-		spawn_btn.text = "Spawn"
-		spawn_btn.pressed.connect(func():
-			var main_board = get_tree().get_first_node_in_group("board")
-			if main_board:
-				main_board.spawn_single_vault_token(pc_name, main_board.get_node("GMCamera").global_position)
-		)
-		row.add_child(spawn_btn)
-		
-		# 3. Add the complete row to the drawer
-		party_list.add_child(row)
+
 
 func _on_system_changed(index: int):
 	var system_ids = SheetTemplates.TEMPLATES.keys()
@@ -368,51 +485,74 @@ func _on_system_changed(index: int):
 	CampaignManager.set_campaign_system(selected_id)
 
 func refresh_scene_dropdown():
-	scene_dropdown.clear()
-	var current_scene = CampaignManager.campaign_data.get("active_scene_id", "")
+	full_scene_list.clear()
 	var scenes = CampaignManager.campaign_data["scenes"].keys()
 	
-	var grouped_scenes = {}
+	# Group the scenes identically to how we did it before
 	for scene_id in scenes:
 		var group_name = "Uncategorized"
 		var display_name = scene_id
 		
-		# If the GM used a colon (e.g., "City: Capital"), split it into a group!
 		if ":" in scene_id:
 			var parts = scene_id.split(":", true, 1)
 			group_name = parts[0].strip_edges()
 			display_name = parts[1].strip_edges()
 			
-		if not grouped_scenes.has(group_name):
-			grouped_scenes[group_name] = []
+		if not full_scene_list.has(group_name):
+			full_scene_list[group_name] = []
 			
-		# We store BOTH the clean display name, and the true scene_id
-		grouped_scenes[group_name].append({"id": scene_id, "display": display_name})
+		full_scene_list[group_name].append({"id": scene_id, "display": display_name})
 		
-	var current_index = 0
-	var active_index = -1
+	# Build the visual tree for the first time with no search filter
+	_build_tree("")
+
+
+func _build_tree(filter_text: String):
+	scene_tree.clear()
+	var root = scene_tree.create_item()
 	
-	# Sort the groups alphabetically
-	var sorted_groups = grouped_scenes.keys()
+	var sorted_groups = full_scene_list.keys()
 	sorted_groups.sort()
+	var filter_lower = filter_text.to_lower()
 	
 	for group in sorted_groups:
-		# Add a visual, unclickable header!
-		scene_dropdown.add_separator(group)
-		current_index += 1
-		
-		for scene_data in grouped_scenes[group]:
-			scene_dropdown.add_item(scene_data["display"])
-			# Hide the REAL scene ID in the item's metadata so the game doesn't get confused
-			scene_dropdown.set_item_metadata(current_index, scene_data["id"])
-			
-			if scene_data["id"] == current_scene:
-				active_index = current_index
+		# 1. Filter out maps that don't match the search
+		var valid_children = []
+		for scene_data in full_scene_list[group]:
+			if filter_text == "" or filter_lower in scene_data["display"].to_lower():
+				valid_children.append(scene_data)
 				
-			current_index += 1
+		# 2. If a folder is empty because of the search, hide it entirely
+		if valid_children.is_empty():
+			continue 
 			
-	if active_index != -1:
-		scene_dropdown.select(active_index)
+		# 3. Create the Category Folder (City, Battlemap, etc.)
+		var category_item = scene_tree.create_item(root)
+		category_item.set_text(0, group)
+		category_item.set_selectable(0, false) # Prevents the GM from "loading" a folder
+		
+		# Auto-expand folders if the GM is searching, otherwise keep them tidy
+		category_item.collapsed = (filter_text == "") 
+		
+		# 4. Populate the actual maps inside the folder
+		for scene_data in valid_children:
+			var item = scene_tree.create_item(category_item)
+			item.set_text(0, scene_data["display"])
+			item.set_metadata(0, scene_data["id"]) # Hide the real ID here
+
+
+func _on_scene_tree_item_activated():
+	# item_activated triggers when the GM double-clicks or hits Enter on a map
+	var selected = scene_tree.get_selected()
+	if selected:
+		var scene_id = selected.get_metadata(0)
+		if scene_id != null: # Make sure they didn't somehow click a folder
+			scene_switched.emit(scene_id)
+			scene_popup.hide()
+			# Update the button text to show the currently loaded map
+			scene_select_btn.text = selected.get_text(0)
+			refresh_toolpallete_lists()
+
 
 # ==========================================
 # TOOL COLOR MANAGER
@@ -458,6 +598,119 @@ func select_tool_by_index(mode_index: int):
 			if btn_erase: btn_erase.button_pressed = true
 		3: 
 			if btn_measure: btn_measure.button_pressed = true
+
+func refresh_toolpallete_lists():
+	# 1. Clear all existing lists
+	if party_list: 
+		for child in party_list.get_children(): 
+			party_list.remove_child(child)
+			child.queue_free()
+			
+	if monster_list: 
+		for child in monster_list.get_children(): 
+			monster_list.remove_child(child)
+			child.queue_free()
+			
+	if npc_list: 
+		for child in npc_list.get_children(): 
+			npc_list.remove_child(child)
+			child.queue_free()
+	
+	var vault = CampaignManager.campaign_data.get("pc_vault", {})
+	
+	# 2. Sort every character in the campaign into their assigned menu
+	for pc_name in vault.keys():
+		var pc_data = vault[pc_name]
+		var category = pc_data.get("menu_category", "Party")
+		var target_list = null
+		
+		if category == "Party" and party_list:
+			target_list = party_list
+		elif category == "Monsters" and monster_list:
+			target_list = monster_list
+		elif category == "NPCs" and npc_list:
+			target_list = npc_list
+			
+		# 3. Build the UI row in the selected list
+		if target_list:
+			var row = HBoxContainer.new()
+			row.mouse_filter = Control.MOUSE_FILTER_PASS
+			
+			# (Wire your right-click deletion here, passing the pc_name)
+			row.gui_input.connect(_on_party_item_right_clicked.bind(pc_name))
+			
+			var portrait = TextureRect.new()
+			var img = Image.load_from_file(pc_data.get("art_path", ""))
+			if img: portrait.texture = ImageTexture.create_from_image(img)
+			portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			portrait.custom_minimum_size = Vector2(40, 40)
+			portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			row.add_child(portrait)
+			
+			var name_lbl = Label.new()
+			name_lbl.text = pc_name
+			name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			row.add_child(name_lbl)
+			
+			var spawn_btn = Button.new()
+			spawn_btn.text = "Spawn"
+			spawn_btn.pressed.connect(func():
+				var main_board = get_tree().get_first_node_in_group("board")
+				if main_board:
+					main_board.spawn_single_vault_token(pc_name, main_board.get_node("GMCamera").global_position)
+			)
+			row.add_child(spawn_btn)
+			
+			target_list.add_child(row)
+
+
+# ==========================================
+# UPNP AND IP COPY LOGIC
+# ==========================================
+func _on_upnp_completed(server_ip: String):
+	if server_ip != "":
+		host_ip_btn.text = "IP: %s (Click to Copy)" % server_ip
+		host_ip_btn.disabled = false
+	else:
+		host_ip_btn.text = "UPnP Failed (Forward Manually)"
+		host_ip_btn.disabled = true
+
+func _on_host_ip_btn_pressed():
+	if NetworkManager.public_ip != "":
+		# Tell Godot to copy the text to your OS clipboard
+		DisplayServer.clipboard_set(NetworkManager.public_ip)
+		
+		# Give visual feedback so the GM knows it worked
+		var original_text = host_ip_btn.text
+		host_ip_btn.text = "Copied to Clipboard!"
+		
+		# Reset the text back to normal after 1.5 seconds
+		get_tree().create_timer(1.5).timeout.connect(func():
+			if is_instance_valid(host_ip_btn):
+				host_ip_btn.text = original_text
+		)
+
+# --- PARTY MENU DELETION ---
+func _on_party_item_right_clicked(event: InputEvent, pc_name: String):
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
+		var popup = PopupMenu.new()
+		popup.add_item("Remove " + pc_name, 0)
+		
+		add_child(popup)
+		popup.position = DisplayServer.mouse_get_position()
+		popup.popup()
+		
+		popup.id_pressed.connect(func(id: int):
+			if id == 0:
+				# 1. Delete the character data strictly from the pc_vault
+				if CampaignManager.campaign_data.has("pc_vault"):
+					CampaignManager.campaign_data["pc_vault"].erase(pc_name)
+				
+				# 2. Force the Party UI to instantly rebuild itself
+				refresh_toolpallete_lists()
+				
+			popup.queue_free()
+		)
 
 
 # Connect the "pressed" signal from your Minus button to this
@@ -512,15 +765,6 @@ func _on_measure_tool_btn_toggled(toggled_on: bool) -> void:
 	if toggled_on:
 		tool_mode_changed.emit(3)
 		update_tool_colors(3)
-
-func _on_scene_dropdown_selected(index: int):
-	var selected_scene_id = scene_dropdown.get_item_metadata(index)
-	
-	if selected_scene_id != null:
-		scene_switched.emit(selected_scene_id)
-	else:
-		# Safety fallback: If they somehow click a separator header, snap them back
-		refresh_scene_dropdown()
 
 func _on_open_folders_btn_pressed() -> void:
 	# 1. Translate the safe 'user://' path into a real Windows/Mac/Linux path

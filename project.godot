@@ -12,7 +12,7 @@ config_version=5
 
 config/name="BushDice"
 config/description="VTT for non humans"
-config/version="0.28"
+config/version="0.38"
 run/main_scene="uid://x4os0solslq1"
 config/features=PackedStringArray("4.7", "Forward Plus")
 config/icon="uid://cri0nqido0tvr"
@@ -25,6 +25,10 @@ CampaignManager="*uid://wubqnymrd8h"
 NetworkManager="*uid://bhshmfunw3xiv"
 Supabase="*uid://cg2ofs0743kte"
 SheetTemplates="*uid://b770yrqg2htx7"
+
+[display]
+
+window/size/mode=1
 
 [editor_plugins]
 

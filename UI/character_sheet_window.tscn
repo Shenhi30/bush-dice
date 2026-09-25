@@ -1,14 +1,14 @@
 [gd_scene format=3 uid="uid://c7o6bdrv70rlo"]
 
-[ext_resource type="StyleBox" uid="uid://bwqvnpqvn36dn" path="res://Assets/Brown_box_flat.tres" id="1_iw3qj"]
+[ext_resource type="StyleBox" uid="uid://bwqvnpqvn36dn" path="res://Themes/Main/Brown_box_flat.tres" id="1_iw3qj"]
 [ext_resource type="Script" uid="uid://bgek320ckesoi" path="res://Scripts/character_sheet_window.gd" id="2_b28lc"]
 [ext_resource type="PackedScene" uid="uid://2a0h66dq03v1" path="res://UI/add_blueprint_popup.tscn" id="3_nbny1"]
 
 [node name="CharacterSheetWindow" type="PanelContainer" unique_id=1768750079]
 offset_left = 136.0
 offset_top = 47.0
-offset_right = 636.0
-offset_bottom = 547.0
+offset_right = 736.0
+offset_bottom = 647.0
 size_flags_horizontal = 3
 size_flags_vertical = 3
 theme_override_styles/panel = ExtResource("1_iw3qj")
@@ -25,6 +25,7 @@ theme_override_constants/margin_bottom = 10
 layout_mode = 2
 
 [node name="HBoxContainer" type="HBoxContainer" parent="MarginContainer/VBoxContainer" unique_id=1390551984]
+custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
 
 [node name="TitleLabel" type="Label" parent="MarginContainer/VBoxContainer/HBoxContainer" unique_id=233982236]
@@ -46,6 +47,17 @@ layout_mode = 2
 theme_override_colors/font_color = Color(0.9676589, 0, 0, 1)
 text = "X"
 flat = true
+
+[node name="GMSettingsRow" type="HBoxContainer" parent="MarginContainer/VBoxContainer" unique_id=995423921]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+
+[node name="CMCheckBox" type="CheckBox" parent="MarginContainer/VBoxContainer/GMSettingsRow" unique_id=2142777577]
+layout_mode = 2
+text = "Gm only"
+
+[node name="CategoryDropdown" type="OptionButton" parent="MarginContainer/VBoxContainer/GMSettingsRow" unique_id=510756874]
+layout_mode = 2
 
 [node name="TabContainer" type="TabContainer" parent="MarginContainer/VBoxContainer" unique_id=1547567576]
 layout_mode = 2

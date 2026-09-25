@@ -1,7 +1,8 @@
 [gd_scene format=3 uid="uid://qdo3ljfkise1"]
 
 [ext_resource type="Script" uid="uid://ugqmh3e37g4n" path="res://Scripts/inventory_window.gd" id="1_hiai5"]
-[ext_resource type="StyleBox" uid="uid://bwqvnpqvn36dn" path="res://Assets/Brown_box_flat.tres" id="1_xju2a"]
+[ext_resource type="StyleBox" uid="uid://bwqvnpqvn36dn" path="res://Themes/Main/Brown_box_flat.tres" id="1_xju2a"]
+[ext_resource type="Theme" uid="uid://d4megw80kf305" path="res://Themes/SpiBoxes/SpinBoxBG.tres" id="3_82ng6"]
 
 [node name="InventoryWindow" type="Panel" unique_id=2073021464]
 offset_right = 400.0
@@ -27,6 +28,7 @@ offset_left = -48.0
 offset_top = -31.0
 grow_horizontal = 0
 grow_vertical = 0
+theme = ExtResource("3_82ng6")
 text = "close"
 flat = true
 
@@ -45,6 +47,7 @@ grow_vertical = 2
 [node name="ItemList" type="VBoxContainer" parent="ScrollContainer" unique_id=957129265]
 custom_minimum_size = Vector2(350, 400)
 layout_mode = 2
+theme = ExtResource("3_82ng6")
 
 [node name="HBoxContainer" type="HBoxContainer" parent="." unique_id=2139601854]
 layout_mode = 1
@@ -55,13 +58,16 @@ offset_bottom = 65.0
 
 [node name="ItemNameInput" type="LineEdit" parent="HBoxContainer" unique_id=3903207]
 layout_mode = 2
+theme = ExtResource("3_82ng6")
 placeholder_text = "Item Name"
 
 [node name="ItemDescInput" type="LineEdit" parent="HBoxContainer" unique_id=1525054197]
 layout_mode = 2
+theme = ExtResource("3_82ng6")
 placeholder_text = "Item Desc/Stats"
 
 [node name="AddItemBtn" type="Button" parent="HBoxContainer" unique_id=1831914840]
 layout_mode = 2
+theme = ExtResource("3_82ng6")
 text = "Add"
 flat = true

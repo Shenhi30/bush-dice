@@ -137,12 +137,12 @@ func _ready():
 	
 	
 	_setup_menu_signals()
-	
+	_update_visibility()
 	if data.has("light_radius"):
 		update_data("light_radius", data["light_radius"], true)
 
 func _process(_delta):
-	var my_name = GameState.player_name # <--- THE FIX: Use our String Name!
+	var my_name = GameState.player_name # Use our String Name!
 	var is_gm = GameState.is_gm_mode
 	
 	# 1. THE HIDE BUTTON LOGIC
@@ -187,6 +187,14 @@ func update_data(key: String, new_value, is_from_network: bool = false):
 		var name_label = get_node_or_null("UI/NameLabel") 
 		if name_label:
 			name_label.text = str(new_value)
+	# --- NEW: APPLY NAME COLOR ---
+	elif key == "name_color":
+		var name_label = get_node_or_null("UI/NameLabel")
+		if name_label:
+			name_label.add_theme_color_override("font_color", Color(str(new_value)))
+			# Give it a thick black outline so bright colors are readable!
+			name_label.add_theme_color_override("font_outline_color", Color.BLACK)
+			name_label.add_theme_constant_override("outline_size", 6)
 	elif key == "hp" or key == "max_hp":
 		var hp_bar = get_node_or_null("UI/HPBar")
 		var hp_text = get_node_or_null("UI/HPBar/HPText") 
@@ -393,13 +401,40 @@ func _on_hp_main_pressed():
 	hp_action_menu.visible = true
 
 func _on_damage_pressed():
-	var new_hp = max(0, data["hp"] - amount_spinbox.value)
+	var old_hp = int(data.get("hp", 0))
+	var damage_amount = int(amount_spinbox.value)
+	var new_hp = max(0, old_hp - damage_amount)
+	
+	# Calculate exact change (- damage)
+	var amount_changed = new_hp - old_hp # This will be negative (e.g., -5)
+	
 	update_data("hp", new_hp)
+	
+	# Trigger Universal Floating Text
+	if amount_changed != 0:
+		var main_board = get_tree().current_scene
+		if main_board and main_board.has_method("broadcast_floating_text"):
+			main_board.broadcast_floating_text(self.name, amount_changed)
+			
 	token_menu.hide()
 
 func _on_heal_pressed():
-	var new_hp = min(data["max_hp"], data["hp"] + amount_spinbox.value)
+	var old_hp = int(data.get("hp", 0))
+	var max_hp = int(data.get("max_hp", old_hp))
+	var heal_amount = int(amount_spinbox.value)
+	var new_hp = min(max_hp, old_hp + heal_amount)
+	
+	# Calculate exact change (+ healing)
+	var amount_changed = new_hp - old_hp # This will be positive (e.g., +10)
+	
 	update_data("hp", new_hp)
+	
+	# Trigger Universal Floating Text
+	if amount_changed != 0:
+		var main_board = get_tree().current_scene
+		if main_board and main_board.has_method("broadcast_floating_text"):
+			main_board.broadcast_floating_text(self.name, amount_changed)
+			
 	token_menu.hide()
 
 func _on_level_up_pressed():
@@ -461,7 +496,18 @@ func _on_clear_light_pressed():
 
 func _on_base_color_changed(color: Color):
 	name_color = color
-	name_label.modulate = name_color
+	
+	# Застосовуємо локально
+	if name_label:
+		name_label.modulate = name_color
+		
+	var hex_code = color.to_html(false)
+	
+	# 1. Надсилаємо колір імені іншим гравцям
+	update_data("name_color", hex_code)
+	
+	# 2. Зберігаємо його як колір Пінгу для цього гравця!
+	GameState.save_player_settings(hex_code)
 
 func _on_edit_btn_pressed():
 	# Read current stats
@@ -566,32 +612,68 @@ func _style_radial_spinbox(spinbox: SpinBox):
 	line_edit.alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 # --- VISUAL UPDATERS ---
+func _update_visibility():
+	var is_hidden = data.get("is_hidden", false)
+	var owner_name = str(data.get("owner_id", "GM"))
+	var my_name = GameState.player_name
+	
+	if is_hidden:
+		# The GM and the Token Owner see a ghostly translucent version
+		if GameState.is_gm_mode or my_name == owner_name:
+			self.visible = true
+			self.modulate.a = 0.4 
+		else:
+			# Other players see absolutely nothing
+			self.visible = false 
+	else:
+		self.visible = true
+		self.modulate.a = 1.0
+
 func update_visuals():
+# --- 1. PERMISSIONS & VISIBILITY ---
+	var is_hidden = data.get("is_hidden", false)
+	var owner_name = str(data.get("owner_id", "GM"))
+	var my_name = GameState.player_name
+	var is_owner = (my_name == owner_name)
+	
+	if is_hidden:
+		# If you are the GM or you own this token, you can see it
+		if GameState.is_gm_mode or is_owner:
+			self.visible = true
+		else:
+			# If you don't own it, it vanishes completely!
+			self.visible = false
+			return # Stop running the rest of the code, since we can't see it anyway
+	else:
+		self.visible = true
+
+	# --- 2. BASE COLORS & ROTATION ---
 	if data["is_dead"]:
 		sprite.rotation_degrees = 90
 		sprite.modulate = Color(0.3, 0.3, 0.3) 
-		return
+	else:
+		sprite.rotation_degrees = 0
+		
+		if is_selected:
+			sprite.modulate = Color(1.5, 1.5, 0.5) # Yellow Piloting
+		elif data["faction"] == "enemy":
+			sprite.modulate = Color(1.0, 0.5, 0.5) # Red Hostile
+		elif data["faction"] == "ally":
+			sprite.modulate = Color(0.5, 1.0, 0.5) # Green Ally
+		elif data.get("is_status_active", false):
+			var c = Color(data["status_color"])
+			sprite.modulate = Color(c.r, c.g, c.b)
+		else:
+			sprite.modulate = Color(1.0, 1.0, 1.0) # Normal Neutral
 
-	sprite.rotation_degrees = 0
-	
-	if is_selected:
-		sprite.modulate = Color(1.5, 1.5, 0.5) # Yellow Piloting
-	elif data["faction"] == "enemy":
-		sprite.modulate = Color(1.0, 0.5, 0.5) # Red Hostile
-	elif data["faction"] == "ally":
-		sprite.modulate = Color(0.5, 1.0, 0.5, 1.0) # Green Ally
-	elif data["is_status_active"]:
-		# Convert the hex string back to a real Godot Color
-		var c = Color(data["status_color"])
-		# Apply the color, but keep the sprite's original transparency (alpha)
-		sprite.modulate = Color(c.r, c.g, c.b, sprite.modulate.a)
+	# --- 3. APPLY GHOST VISION OPACITY ---
+	# We already proved you are allowed to see it in Step 1. 
+	# Now, if it's hidden, apply the ghostly transparency!
+	if is_hidden:
+		sprite.modulate.a = 0.4 
 	else:
-		sprite.modulate = Color(1.0, 1.0, 1.0, sprite.modulate.a) # Normal Neutral
-	# --- GM GHOST VISION ---
-	if data.get("is_hidden", false) and GameState.is_gm_mode:
-		sprite.modulate.a = 0.4 # Make it ghostly!
-	else:
-		sprite.modulate.a = 1.0 # Solid
+		sprite.modulate.a = 1.0
+
 
 func normalize_size():
 	if sprite.texture == null:

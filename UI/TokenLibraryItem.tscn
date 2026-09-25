@@ -3,7 +3,7 @@
 [ext_resource type="Script" uid="uid://cds1g3mnfc3kg" path="res://Scripts/TokenDragItem.gd" id="1_re2up"]
 
 [node name="TextureRect" type="VBoxContainer" unique_id=852708694]
-custom_minimum_size = Vector2(80, 80)
+custom_minimum_size = Vector2(90, 110)
 offset_right = 80.0
 offset_bottom = 80.0
 mouse_filter = 0
@@ -14,4 +14,5 @@ layout_mode = 2
 mouse_filter = 2
 
 [node name="NameLabel" type="Label" parent="." unique_id=1682688397]
+custom_minimum_size = Vector2(90, 0)
 layout_mode = 2

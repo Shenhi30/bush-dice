@@ -6,6 +6,7 @@
 [ext_resource type="Script" uid="uid://ot0uea5lnjo8" path="res://Scripts/CameraControls.gd" id="4_njf4n"]
 [ext_resource type="PackedScene" uid="uid://rq2pa5oxxsa1" path="res://UI/gm_dashboard.tscn" id="4_u7eij"]
 [ext_resource type="Script" uid="uid://dbvpg2fnr187e" path="res://Scripts/DropZone.gd" id="5_d5o86"]
+[ext_resource type="PackedScene" uid="uid://dx434mvcw1tkd" path="res://UI/QuestWindow.tscn" id="6_6gqwh"]
 [ext_resource type="Script" uid="uid://5utvh4al0krb" path="res://Scripts/QuestTracker.gd" id="7_d5o86"]
 [ext_resource type="PackedScene" uid="uid://qdo3ljfkise1" path="res://Scenes/inventory_window.tscn" id="7_wxlku"]
 [ext_resource type="PackedScene" uid="uid://c7o6bdrv70rlo" path="res://UI/character_sheet_window.tscn" id="8_cvtiy"]
@@ -55,6 +56,9 @@ layer = 10
 [node name="GMDashboard" parent="UILayer" unique_id=1538053333 instance=ExtResource("4_u7eij")]
 layer = 11
 
+[node name="QuestWindow" parent="UILayer" unique_id=123893291 instance=ExtResource("6_6gqwh")]
+visible = false
+
 [node name="TabContainer" type="TabContainer" parent="UILayer" unique_id=1725244790]
 anchors_preset = 1
 anchor_left = 1.0
@@ -62,10 +66,9 @@ anchor_right = 1.0
 offset_left = -155.0
 offset_bottom = 648.0
 grow_horizontal = 0
-current_tab = 1
+current_tab = 0
 
 [node name="InitiativeTracker" type="PanelContainer" parent="UILayer/TabContainer" unique_id=808262133]
-visible = false
 layout_mode = 2
 mouse_filter = 1
 metadata/_tab_index = 0
@@ -91,6 +94,10 @@ layout_mode = 2
 text = "Reset"
 autowrap_mode = 3
 
+[node name="NextTurn" type="Button" parent="UILayer/TabContainer/InitiativeTracker/MarginContainer/VBoxContainer" unique_id=733999524]
+layout_mode = 2
+text = "Next turn"
+
 [node name="HSeparator" type="HSeparator" parent="UILayer/TabContainer/InitiativeTracker/MarginContainer/VBoxContainer" unique_id=378939025]
 layout_mode = 2
 
@@ -98,6 +105,7 @@ layout_mode = 2
 layout_mode = 2
 
 [node name="ChatPanel" type="Panel" parent="UILayer/TabContainer" unique_id=1959821814]
+visible = false
 layout_mode = 2
 mouse_filter = 1
 metadata/_tab_index = 1
