@@ -132,22 +132,31 @@ func generate_ui(template: Dictionary, character_data: Dictionary, token_name: S
 				auto_math_btn.set_pressed_no_signal(local_data.get("use_auto_math", true))
 		
 	if category_dropdown and GameState.is_gm_mode:
-			var current_category = local_data.get("menu_category", "Party")
+		# Ховаємо старий випадаючий список, нам він більше не потрібен!
+		category_dropdown.hide() 
+		
+		var parent_container = category_dropdown.get_parent()
+		var cat_input = parent_container.get_node_or_null("CustomCategoryInput")
+		
+		# Якщо ми ще не створили текстове поле, створюємо його динамічно
+		if not cat_input:
+			cat_input = LineEdit.new()
+			cat_input.name = "CustomCategoryInput"
+			cat_input.placeholder_text = "e.g. Bosses, Summons..."
+			cat_input.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			
-			local_data["menu_category"] = current_category
+			# Вставляємо його на місце старого випадаючого списку
+			parent_container.add_child(cat_input)
+			parent_container.move_child(cat_input, category_dropdown.get_index())
 			
-			var found_index = -1
+			# Підключаємо сигнал збереження при введенні тексту
+			cat_input.text_changed.connect(func(new_text: String):
+				local_data["menu_category"] = new_text.strip_edges()
+				save_sheet_to_token()
+			)
 			
-			for i in range(category_dropdown.get_item_count()):
-				if category_dropdown.get_item_text(i) == current_category:
-					found_index = i
-					break
-					
-			if found_index != -1:
-				category_dropdown.select(found_index)
-			else:
-				# Fallback to Party if the data is missing or invalid
-				category_dropdown.select(0)
+		# Встановлюємо поточну категорію (за замовчуванням Party)
+		cat_input.text = local_data.get("menu_category", "Party")
 
 	# Grab the dice logic for the active system
 	current_dice_logic = template.get("dice_logic", "d20_high")
@@ -437,6 +446,16 @@ func generate_ui(template: Dictionary, character_data: Dictionary, token_name: S
 	
 	is_building_ui = false
 
+func _on_category_selected(index: int):
+	if category_dropdown:
+		var selected_category = category_dropdown.get_item_text(index)
+		
+		# 1. Force it into local memory instantly
+		local_data["menu_category"] = selected_category
+		
+		# 2. Trigger your perfect save function!
+		save_sheet_to_token()
+
 # --- AUTO-MATH ENGINE ---
 
 func _on_stat_changed(value: float, stat_id: String):
@@ -724,6 +743,34 @@ func _draw_spell_book(container: Control, max_level: int):
 		title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		title.add_theme_color_override("font_color", Color(0.6, 0.8, 1.0))
 		
+		if level > 0:
+			var slot_label = Label.new()
+			slot_label.text = "Slots: "
+			header.add_child(slot_label)
+			
+			var max_slots = SpinBox.new()
+			max_slots.min_value = 0
+			max_slots.max_value = 20
+			max_slots.custom_minimum_size.x = 55
+			max_slots.value = int(local_data.get("spell_slots_max_" + level_str, 0))
+			header.add_child(max_slots)
+			
+			var cb_container = HBoxContainer.new()
+			header.add_child(cb_container)
+			
+			# Малюємо чекбокси
+			var used_slots = int(local_data.get("spell_slots_used_" + level_str, 0))
+			for j in range(max_slots.value):
+				var cb = CheckBox.new()
+				cb.focus_mode = Control.FOCUS_NONE # Прибираємо некрасиву рамку фокусу
+				cb.button_pressed = (j < used_slots)
+				# Підключаємо сигнал для відстеження кліків
+				cb.toggled.connect(_on_spell_slot_toggled.bind(cb_container, level_str))
+				cb_container.add_child(cb)
+				
+			# Оновлюємо кількість чекбоксів, якщо змінили Max Slots
+			max_slots.value_changed.connect(_on_max_slots_changed.bind(container, max_level, level_str))
+		
 		var add_btn = Button.new()
 		add_btn.text = "+ Add Spell"
 		add_btn.pressed.connect(_on_add_spell_pressed.bind(container, max_level, level_str))
@@ -773,10 +820,20 @@ func _draw_spell_book(container: Control, max_level: int):
 			sides_spin.value_changed.connect(_on_spell_number_changed.bind("dice_sides", level_str, i))
 			spell_row.add_child(sides_spin)
 			
-			# 4. Кнопки: Кидок (🎲), Опис (📝), Видалити (X)
+			#  4. Вибір Характеристики (Attribute Dropdown) ---
+			var attr_select = OptionButton.new()
+			var attrs = ["None", "STR", "DEX", "CON", "INT", "WIS", "CHA"]
+			for a in attrs:
+				attr_select.add_item(a)
+				
+			attr_select.selected = spell.get("attr_index", 0)
+			attr_select.item_selected.connect(_on_spell_attr_changed.bind("attr_index", level_str, i))
+			spell_row.add_child(attr_select)
+			
+			# 5. Кнопки: Кидок (🎲), Опис (📝), Видалити (X)
 			var roll_btn = Button.new()
 			roll_btn.text = "🎲Roll"
-			roll_btn.pressed.connect(func(): _on_spell_roll_pressed(name_input.text, count_spin.value, sides_spin.value))
+			roll_btn.pressed.connect(func(): _on_spell_roll_pressed(name_input.text, count_spin.value, sides_spin.value, attr_select.selected))
 			spell_row.add_child(roll_btn)
 			
 			var desc_btn = Button.new()
@@ -795,6 +852,19 @@ func _draw_spell_book(container: Control, max_level: int):
 		level_box.add_child(HSeparator.new())
 		container.add_child(level_box)
 
+func _on_spell_attr_changed(index_value: int, key: String, level_str: String, spell_index: int):
+	var spells_dict = local_data.get("spells", {})
+	if typeof(spells_dict) != TYPE_DICTIONARY: return
+		
+	var spell_list = spells_dict.get(level_str, [])
+	if typeof(spell_list) != TYPE_ARRAY: return
+		
+	if spell_index < spell_list.size():
+		if typeof(spell_list[spell_index]) == TYPE_DICTIONARY:
+			spell_list[spell_index][key] = index_value
+			spells_dict[level_str] = spell_list
+			local_data["spells"] = spells_dict
+			save_sheet_to_token()
 
 func _on_spell_number_changed(value: float, key: String, level_str: String, index: int):
 	var spells_dict = local_data.get("spells", {})
@@ -837,33 +907,81 @@ func _on_desc_btn_pressed(level_str: String, index: int, spell_name: String, cur
 	
 	dialog.popup_centered()
 
-func _on_spell_roll_pressed(spell_name: String, count: int, sides: int):
-	# Don't try to roll 0d0
+func _on_spell_roll_pressed(spell_name: String, count: int, sides: int, attr_index: int):
 	if count <= 0 or sides <= 0: return 
 	
-	# 1. Do the Math!
-	var total = 0
+	# 1. Рахуємо кубики
+	var dice_total = 0
 	var rolls = []
 	for i in range(count):
 		var r = randi_range(1, sides)
 		rolls.append(r)
-		total += r
+		dice_total += r
 		
-	# 2. Format a beautiful message for the chat
-	var display_name = spell_name if spell_name != "" else "Unknown Spell"
-	var msg = "\n%s casts [b]%s[/b]!\nEffect: [color=yellow]%sd%s %s = %s[/color]" % [current_token_name, display_name, count, sides, str(rolls), total]
+	# 2. Шукаємо модифікатор характеристики
+	var modifier = 0
+	var attr_string = ""
 	
-	# 3. Route it directly to the MainBoard chat network
+	if attr_index > 0:
+		var stat_keys = ["none", "str", "dex", "con", "int", "wis", "cha"]
+		var base_stat = stat_keys[attr_index]
+		attr_string = " + " + base_stat.to_upper()
+		
+		# Спочатку шукаємо модифікатор (напр. "int_mod"), якщо його немає — беремо чистий стат ("int")
+		if local_data.has(base_stat + "_mod"):
+			modifier = int(local_data[base_stat + "_mod"])
+		else:
+			modifier = int(local_data.get(base_stat, 0))
+			
+	var final_total = dice_total + modifier
+	
+	# 3. Форматуємо красиве повідомлення
+	var display_name = spell_name if spell_name != "" else "Unknown Spell"
+	var mod_display = (" +" + str(modifier)) if modifier > 0 else ((" " + str(modifier)) if modifier < 0 else "")
+	
+	var actual_character_name = local_data.get("name", current_token_name)
+	
+	var msg = "\n%s casts [b]%s[/b]!\nEffect: [color=yellow]%sd%s%s %s%s = %s[/color]" % [
+		actual_character_name, # <--- Тепер тут справжнє ім'я!
+		display_name, 
+		count, 
+		sides, 
+		attr_string,
+		str(rolls), 
+		mod_display, 
+		final_total
+	]
+	
+	# 4. ВІДПРАВЛЯЄМО В МЕРЕЖУ З УРАХУВАННЯМ "GM ONLY"
 	var main = get_tree().current_scene
 	var my_name = GameState.player_name
 	var color = "#ffd700" if GameState.is_gm_mode else "#99ccff"
 	
 	if main.has_method("receive_chat_message"):
-		if multiplayer.is_server():
-			main.receive_chat_message(my_name, msg, color)
-			main.rpc("receive_chat_message", my_name, msg, color)
+		
+		# ПЕРЕВІРЯЄМО ГАЛОЧКУ "GM ONLY" З ПАНЕЛІ КУБИКІВ MAINBOARD
+		var is_secret = false
+		if main.get("whisper_check") != null:
+			is_secret = main.whisper_check.button_pressed
+			
+		# ЯКЩО СЕКРЕТНО
+		if is_secret:
+			var secret_msg = "[color=#b266ff][i](Secret Spell)[/i]" + msg + "[/color]\n"
+			
+			# Друкуємо локально, щоб гравець бачив свій секретний кидок
+			main.receive_chat_message(my_name, secret_msg, color)
+			
+			# Якщо це гравець (не сервер), відправляємо шепіт GM-у
+			if not multiplayer.is_server():
+				main.rpc_id(1, "receive_whisper", secret_msg)
+				
+		# ЯКЩО ПУБЛІЧНО
 		else:
-			main.rpc_id(1, "request_chat_message", my_name, msg, color)
+			if multiplayer.is_server():
+				main.receive_chat_message(my_name, msg, color)
+				main.rpc("receive_chat_message", my_name, msg, color)
+			else:
+				main.rpc_id(1, "request_chat_message", my_name, msg, color)
 
 func _on_add_spell_pressed(container: Control, max_level: int, level_str: String):
 	var spells_dict = local_data.get("spells", {})
@@ -908,6 +1026,30 @@ func _on_spell_text_changed(new_text: String, key: String, level_str: String, in
 			spell_list[index][key] = new_text
 			spells_dict[level_str] = spell_list
 			local_data["spells"] = spells_dict
+
+func _on_spell_slot_toggled(is_pressed: bool, cb_container: Control, level_str: String):
+	# Рахуємо, скільки чекбоксів зараз натиснуто
+	var count = 0
+	for child in cb_container.get_children():
+		if child is CheckBox and child.button_pressed:
+			count += 1
+			
+	# Зберігаємо це число
+	local_data["spell_slots_used_" + level_str] = count
+	save_sheet_to_token()
+
+func _on_max_slots_changed(val: float, container: Control, max_level: int, level_str: String):
+	local_data["spell_slots_max_" + level_str] = int(val)
+	
+	# Якщо ми зменшили максимум слотів, переконуємося, що використані слоти не перевищують новий максимум
+	var used = int(local_data.get("spell_slots_used_" + level_str, 0))
+	if used > int(val):
+		local_data["spell_slots_used_" + level_str] = int(val)
+		
+	save_sheet_to_token()
+	
+	# Перемальовуємо інтерфейс, щоб додати або видалити чекбокси на екрані
+	_draw_spell_book(container, max_level)
 
 #=========================================
 #=========================================

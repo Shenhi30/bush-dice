@@ -49,6 +49,7 @@ var full_scene_list = {}
 @onready var monster_list = $ToolPallete/TabContainer/Monsters/MonsterList
 @onready var npc_list = $ToolPallete/TabContainer/NPCs/NPCList
 
+
 @onready var shape_dropdown = $ToolPallete/TabContainer/Tools/MeasureShapeDropdown
 # -- RENAME --
 @onready var rename_btn = $HBoxContainer/RenameSceneBtn
@@ -212,7 +213,6 @@ func _ready():
 		# Hide it if a regular player somehow sees this dashboard
 		host_ip_btn.visible = false
 
-
 func _process(delta: float):
 	# The 'delta' ensures the zoom speed is the same regardless of framerate
 	var zoom_speed = 1.0 # Change this to make the zoom faster or slower!
@@ -333,7 +333,6 @@ func _build_token_group(folder_path: String, group_name: String, filter_text: St
 	for f in valid_files:
 		spawn_library_icon(folder_path + "/" + f, category_grid) # Pass the new grid!
 
-
 func spawn_library_icon(file_path: String, target_grid: GridContainer):
 	var icon_scene = preload("res://UI/TokenLibraryItem.tscn")
 	var new_item = icon_scene.instantiate()
@@ -363,7 +362,6 @@ func spawn_library_icon(file_path: String, target_grid: GridContainer):
 	new_item.token_image_path = file_path
 	
 	target_grid.add_child(new_item)
-
 
 func refresh_map_library():
 	for child in map_grid.get_children():
@@ -474,8 +472,6 @@ func spawn_map_icon(file_path: String, target_grid: GridContainer):
 	# ---------------------------
 	
 	target_grid.add_child(new_icon)
-
-
 
 func _on_system_changed(index: int):
 	var system_ids = SheetTemplates.TEMPLATES.keys()
@@ -600,43 +596,63 @@ func select_tool_by_index(mode_index: int):
 			if btn_measure: btn_measure.button_pressed = true
 
 func refresh_toolpallete_lists():
-	# 1. Clear all existing lists
-	if party_list: 
-		for child in party_list.get_children(): 
-			party_list.remove_child(child)
-			child.queue_free()
-			
-	if monster_list: 
-		for child in monster_list.get_children(): 
-			monster_list.remove_child(child)
-			child.queue_free()
-			
-	if npc_list: 
-		for child in npc_list.get_children(): 
-			npc_list.remove_child(child)
-			child.queue_free()
+	# 1. Очищаємо стандартні списки
+	if party_list: for child in party_list.get_children(): child.queue_free()
+	if monster_list: for child in monster_list.get_children(): child.queue_free()
+	if npc_list: for child in npc_list.get_children(): child.queue_free()
+		
+	var tab_container = $ToolPallete/TabContainer
+	var permanent_tabs = ["Tools", "Party", "Monsters", "NPCs"]
 	
+	# 2. Видаляємо всі попередньо згенеровані кастомні вкладки (щоб не було дублікатів)
+	for child in tab_container.get_children():
+		if not child.name in permanent_tabs:
+			tab_container.remove_child(child)
+			child.queue_free()
+			
 	var vault = CampaignManager.campaign_data.get("pc_vault", {})
 	
-	# 2. Sort every character in the campaign into their assigned menu
+	# 3. Розподіляємо персонажів
 	for pc_name in vault.keys():
 		var pc_data = vault[pc_name]
 		var category = pc_data.get("menu_category", "Party")
+		if category == "": category = "Party" # Захист від порожніх рядків
+		
 		var target_list = null
 		
+		# Якщо це стандартна вкладка — використовуємо існуючий список
 		if category == "Party" and party_list:
 			target_list = party_list
 		elif category == "Monsters" and monster_list:
 			target_list = monster_list
 		elif category == "NPCs" and npc_list:
 			target_list = npc_list
+		else:
+			# --- ЦЕ КАСТОМНА КАТЕГОРІЯ! ---
+			# Перевіряємо, чи ми вже створили для неї вкладку під час цього циклу
+			var custom_tab = tab_container.get_node_or_null(category)
 			
-		# 3. Build the UI row in the selected list
+			if not custom_tab:
+				# Генеруємо нову вкладку (ScrollContainer)
+				custom_tab = ScrollContainer.new()
+				custom_tab.name = category 
+				custom_tab.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+				
+				# Додаємо VBoxContainer для списку всередину
+				var vbox = VBoxContainer.new()
+				vbox.name = "List"
+				vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				custom_tab.add_child(vbox)
+				
+				# Додаємо вкладку в інтерфейс!
+				tab_container.add_child(custom_tab)
+				
+			target_list = custom_tab.get_node("List")
+			
+		# 4. Будуємо рядок токена (UI Row) у знайденому списку
 		if target_list:
 			var row = HBoxContainer.new()
 			row.mouse_filter = Control.MOUSE_FILTER_PASS
-			
-			# (Wire your right-click deletion here, passing the pc_name)
 			row.gui_input.connect(_on_party_item_right_clicked.bind(pc_name))
 			
 			var portrait = TextureRect.new()
@@ -662,7 +678,6 @@ func refresh_toolpallete_lists():
 			row.add_child(spawn_btn)
 			
 			target_list.add_child(row)
-
 
 # ==========================================
 # UPNP AND IP COPY LOGIC

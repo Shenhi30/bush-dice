@@ -1766,23 +1766,24 @@ func open_character_sheet_for_token(token_name: String):
 	var token = token_layer.get_node_or_null(token_name)
 	if not token: return
 	
-	# If the sheet template is missing or empty, force it to load D&D 5e by default!
-	if not CampaignManager.campaign_data.has("sheet_template") or CampaignManager.campaign_data["sheet_template"].is_empty():
-		# IMPORTANT: Change "dnd5e_template" below to whatever your actual variable 
-		# is named inside your SheetTemplates.gd autoload file!
-		CampaignManager.campaign_data["sheet_template"] = SheetTemplates.TEMPLATES["dnd_5e"]
+	# --- ВИПРАВЛЕННЯ: ЗАВЖДИ БРАТИ НАЙСВІЖІШИЙ ШАБЛОН ---
+	# Замість того, щоб покладатися на старе збереження, ми примусово 
+	# оновлюємо шаблон кампанії найсвіжішою версією з нашого коду.
+	# (Якщо у вас є вибір систем, тут можна додати перевірку, яку саме систему завантажувати)
+	CampaignManager.campaign_data["sheet_template"] = SheetTemplates.TEMPLATES["dnd_5e"]
 	
-	# We duplicate the token's brain and manually inject the art path 
-	# so the Character Sheet UI can find it!
+	# Дублюємо пам'ять токена і вручну додаємо шлях до арту
 	var combined_data = token.data.duplicate()
 	combined_data["art_path"] = token.art_path
 	
-	# Pass the combined data into the sheet generator
+	# Передаємо об'єднані дані у генератор аркуша
 	char_sheet_window.generate_ui(CampaignManager.campaign_data["sheet_template"], combined_data, token.name)
 	
-	# Show the window and bring it to the front
+	# Показуємо вікно і виводимо на передній план
 	char_sheet_window.visible = true
-	char_sheet_window.move_to_front()
+	
+	if char_sheet_window.has_method("move_to_front"):
+		char_sheet_window.move_to_front()
 
 # ==========================================
 # CHAT AND DICE LOG
