@@ -212,6 +212,8 @@ func _ready():
 	else:
 		# Hide it if a regular player somehow sees this dashboard
 		host_ip_btn.visible = false
+		
+	_setup_minigames_panel()
 
 func _process(delta: float):
 	# The 'delta' ensures the zoom speed is the same regardless of framerate
@@ -704,6 +706,81 @@ func _on_host_ip_btn_pressed():
 			if is_instance_valid(host_ip_btn):
 				host_ip_btn.text = original_text
 		)
+
+
+
+# ==========================================
+# MINIGAME DASHBOARD PANEL
+# ==========================================
+func _setup_minigames_panel():
+	var tools_tab = $ToolPallete/TabContainer/Tools
+	if not tools_tab: return
+		
+	var sep = HSeparator.new()
+	sep.add_theme_constant_override("separation", 25)
+	tools_tab.add_child(sep)
+	
+	var title = Label.new()
+	title.text = "--- MINIGAMES ---"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_color_override("font_color", Color(1, 0.8, 0)) 
+	tools_tab.add_child(title)
+	
+	var target_input = LineEdit.new()
+	target_input.placeholder_text = "Target Player Name..."
+	tools_tab.add_child(target_input)
+	
+	var game_dropdown = OptionButton.new()
+	game_dropdown.add_item("The Tumbler (DEX)")
+	game_dropdown.add_item("Frequency Decoder (INT/WIS)")
+	game_dropdown.add_item("Hex Decoder (INT/WIS)")
+	tools_tab.add_child(game_dropdown)
+	
+	var hbox = HBoxContainer.new()
+	
+	var stat_label = Label.new()
+	stat_label.text = "Stat Mod:"
+	hbox.add_child(stat_label)
+	
+	var stat_spin = SpinBox.new()
+	stat_spin.min_value = -5
+	stat_spin.max_value = 20
+	stat_spin.value = 0
+	hbox.add_child(stat_spin)
+	
+	# --- TIMER SPINBOX ---
+	var time_label = Label.new()
+	time_label.text = " Time (s):"
+	hbox.add_child(time_label)
+	
+	var time_spin = SpinBox.new()
+	time_spin.min_value = 5
+	time_spin.max_value = 300
+	time_spin.value = 30 # Default to 30 seconds
+	time_spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hbox.add_child(time_spin)
+	
+	tools_tab.add_child(hbox)
+	
+	var send_btn = Button.new()
+	send_btn.text = "🚀 Launch Minigame"
+	tools_tab.add_child(send_btn)
+	
+	send_btn.pressed.connect(func():
+		var main_board = get_tree().get_first_node_in_group("board")
+		if main_board and main_board.has_method("send_minigame_to_player"):
+			var target = target_input.text.strip_edges()
+			if target == "": return
+				
+			var game_idx = game_dropdown.selected
+			var mod = int(stat_spin.value)
+			var time_limit = int(time_spin.value) # Get the time!
+			
+			# Send BOTH the stat mod and the time limit!
+			main_board.send_minigame_to_player(target, game_idx, mod, time_limit)
+	)
+
+
 
 # --- PARTY MENU DELETION ---
 func _on_party_item_right_clicked(event: InputEvent, pc_name: String):

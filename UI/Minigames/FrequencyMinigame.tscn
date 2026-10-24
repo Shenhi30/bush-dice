@@ -1,0 +1,44 @@
+[gd_scene format=3 uid="uid://bgphxe2t78gkv"]
+
+[ext_resource type="StyleBox" uid="uid://bwqvnpqvn36dn" path="res://Themes/Main/Brown_box_flat.tres" id="1_k7ed0"]
+[ext_resource type="Script" uid="uid://dbppm3gjpe1va" path="res://Scripts/frequency_minigame.gd" id="2_n58g3"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_n58g3"]
+bg_color = Color(0.47201586, 0.25462884, 0.059309192, 1)
+
+[node name="FrequencyMinigame" type="PanelContainer" unique_id=1666904435]
+custom_minimum_size = Vector2(400, 400)
+theme_override_styles/panel = ExtResource("1_k7ed0")
+script = ExtResource("2_n58g3")
+
+[node name="MarginContainer" type="MarginContainer" parent="." unique_id=1136838292]
+layout_mode = 2
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 20
+
+[node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer" unique_id=2098620340]
+layout_mode = 2
+theme_override_constants/separation = 15
+
+[node name="TitleLabel" type="Label" parent="MarginContainer/VBoxContainer" unique_id=1071780178]
+layout_mode = 2
+text = "FREQUENCY DECODER"
+horizontal_alignment = 1
+
+[node name="TimerBar" type="ProgressBar" parent="MarginContainer/VBoxContainer" unique_id=153334472]
+custom_minimum_size = Vector2(0, 10)
+layout_mode = 2
+theme_override_styles/fill = SubResource("StyleBoxFlat_n58g3")
+show_percentage = false
+
+[node name="DisplayControl" type="Control" parent="MarginContainer/VBoxContainer" unique_id=1210506255]
+custom_minimum_size = Vector2(250, 250)
+layout_mode = 2
+
+[node name="InstructionLabel" type="Label" parent="MarginContainer/VBoxContainer" unique_id=1967081881]
+layout_mode = 2
+text = "Press 1, 2, 3 to select ring.
+Mouse Wheel to rotate."
+horizontal_alignment = 1

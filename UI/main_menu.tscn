@@ -12,14 +12,13 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_p8ccj")
 
-[node name="ColorRect" type="ColorRect" parent="." unique_id=616950100]
+[node name="ColorRect" type="TextureRect" parent="." unique_id=1049621469]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.3854925, 0.38549247, 0.38549247, 1)
 
 [node name="CenterContainer" type="CenterContainer" parent="." unique_id=1698054845]
 layout_mode = 1
@@ -69,7 +68,7 @@ text = "Change Name"
 [node name="SettingsFeedbackLabel" type="Label" parent="CenterContainer/VBoxContainer" unique_id=168233937]
 layout_mode = 2
 
-[node name="Label" type="Label" parent="CenterContainer/VBoxContainer" unique_id=2049829437]
+[node name="HotkeysLabel" type="Label" parent="CenterContainer/VBoxContainer" unique_id=2049829437]
 layout_mode = 2
 text = "Press x - change token to enemy/neutral/ally
 SHIFT + LMB to select multiple tokens
@@ -88,16 +87,18 @@ file_mode = 0
 access = 2
 filters = PackedStringArray("*.json")
 
-[node name="Label" type="Label" parent="." unique_id=1645612379]
+[node name="VersionLabel" type="Label" parent="." unique_id=1645612379]
 layout_mode = 1
 anchors_preset = 3
 anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -40.0
-offset_top = -23.0
+offset_left = -93.0
+offset_top = -49.0
 grow_horizontal = 0
 grow_vertical = 0
-text = "version 0.38"
+text = "version 0.40
+"
 horizontal_alignment = 1
+vertical_alignment = 2

@@ -2011,3 +2011,47 @@ func receive_ping(pos: Vector2, color_hex: String):
 	
 	# Видаляємо об'єкт після завершення, щоб не забивати пам'ять
 	tween.tween_callback(ping.queue_free)
+
+
+
+# ==========================================
+# MINIGAME NETWORK SYSTEM
+# ==========================================
+func send_minigame_to_player(target_player_name: String, game_index: int, mod1: int, mod2: int):
+	# Відправляємо команду всім клієнтам (включно з сервером)
+	rpc("receive_minigame_trigger", target_player_name, game_index, mod1, mod2)
+
+@rpc("any_peer", "call_local")
+func receive_minigame_trigger(target_name: String, game_index: int, mod1: int, mod2: int):
+	# Відкриваємо міні-гру ТІЛЬКИ якщо ви — цільовий гравець, АБО якщо ви — GM
+	if GameState.player_name == target_name or GameState.is_gm_mode:
+		_spawn_minigame_ui(game_index, mod1, mod2)
+
+func _spawn_minigame_ui(game_index: int, mod1: int, mod2: int):
+	var minigame_scene = null
+	
+	match game_index:
+		0: # The Tumbler
+			minigame_scene = preload("res://UI/Minigames/TumblerMinigame.tscn").instantiate()
+			minigame_scene.initialize(mod1, mod2) # Added mod2!
+		1: # Frequency Decoder
+			minigame_scene = preload("res://UI/Minigames/FrequencyMinigame.tscn").instantiate()
+			minigame_scene.initialize(mod1, mod2) # Added mod2!
+		2: # Hex Decoder (WIP)
+			minigame_scene = preload("res://UI/Minigames/HexDecoderMinigame.tscn").instantiate()
+			minigame_scene.initialize(mod1, mod2)
+			
+	if minigame_scene == null: return
+		
+	# Add to the screen
+	if has_node("UILayer"):
+		$UILayer.add_child(minigame_scene)
+	else:
+		add_child(minigame_scene)
+	
+	minigame_scene.set_anchors_preset(Control.PRESET_CENTER)
+	
+	# GM Preview formatting
+	if GameState.is_gm_mode:
+		minigame_scene.scale = Vector2(0.6, 0.6) 
+		minigame_scene.position = Vector2(20, 50)

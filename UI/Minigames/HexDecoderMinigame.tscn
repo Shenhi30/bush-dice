@@ -1,0 +1,56 @@
+[gd_scene format=3 uid="uid://dl4m6lnm52o64"]
+
+[ext_resource type="StyleBox" uid="uid://bwqvnpqvn36dn" path="res://Themes/Main/Brown_box_flat.tres" id="1_nkhck"]
+[ext_resource type="Script" uid="uid://uhh1ko2crti1" path="res://Scripts/HexDecoderMinigame.gd" id="2_q8b2r"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_nkhck"]
+bg_color = Color(0.8238249, 0, 0, 1)
+
+[node name="HexDecoder" type="PanelContainer" unique_id=2044645385]
+custom_minimum_size = Vector2(750, 600)
+theme_override_styles/panel = ExtResource("1_nkhck")
+script = ExtResource("2_q8b2r")
+
+[node name="MarginContainer" type="MarginContainer" parent="." unique_id=2032810354]
+layout_mode = 2
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 20
+
+[node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer" unique_id=1289352288]
+layout_mode = 2
+theme_override_constants/separation = 15
+
+[node name="TitleLabel" type="Label" parent="MarginContainer/VBoxContainer" unique_id=600667742]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.90683234, 0.7585879, 0, 1)
+text = "TERMINAL OVERRIDE"
+horizontal_alignment = 1
+
+[node name="TimerBar" type="ProgressBar" parent="MarginContainer/VBoxContainer" unique_id=1054896275]
+custom_minimum_size = Vector2(0, 10)
+layout_mode = 2
+theme_override_styles/fill = SubResource("StyleBoxFlat_nkhck")
+show_percentage = false
+
+[node name="TargetSequenceLabel" type="Label" parent="MarginContainer/VBoxContainer" unique_id=1800124665]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.66706294, 0.03494793, 0.7911905, 1)
+text = "TARGET"
+horizontal_alignment = 1
+
+[node name="AttemptSequenceLabel" type="Label" parent="MarginContainer/VBoxContainer" unique_id=1044960397]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.90683234, 0.7585879, 0, 1)
+text = "ATTEMPT"
+horizontal_alignment = 1
+
+[node name="CenterContainer" type="CenterContainer" parent="MarginContainer/VBoxContainer" unique_id=811206324]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="WordGrid" type="GridContainer" parent="MarginContainer/VBoxContainer/CenterContainer" unique_id=508038326]
+layout_mode = 2
+theme_override_constants/h_separation = 5
+theme_override_constants/v_separation = 5
