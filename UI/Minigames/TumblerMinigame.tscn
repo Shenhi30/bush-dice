@@ -32,8 +32,12 @@ layout_mode = 2
 theme_override_styles/fill = SubResource("StyleBoxFlat_jv1ba")
 show_percentage = false
 
-[node name="PinContainer" type="HBoxContainer" parent="MarginContainer/VBoxContainer" unique_id=778918374]
-layout_mode = 2
+[node name="PinContainer" type="Control" parent="MarginContainer/VBoxContainer/TimerBar" unique_id=1059484661]
+custom_minimum_size = Vector2(200, 200)
+anchors_preset = 0
+offset_top = -220.0
+offset_right = 356.0
+offset_bottom = -20.0
 
 [node name="ActionBtn" type="Button" parent="MarginContainer/VBoxContainer" unique_id=711054356]
 layout_mode = 2

@@ -1,161 +1,194 @@
 extends PanelContainer
 
-@onready var pin_container = $MarginContainer/VBoxContainer/PinContainer
-@onready var action_btn = $MarginContainer/VBoxContainer/ActionBtn
-@onready var title_label = $MarginContainer/VBoxContainer/TitleLabel
+signal minigame_finished(success: bool)
+
 @onready var timer_bar = $MarginContainer/VBoxContainer/TimerBar
+@onready var title_label = $MarginContainer/VBoxContainer/TitleLabel
+@onready var pins_grid = $MarginContainer/VBoxContainer/PinsGrid
 
 var time_left: float = 30.0
 var minigame_active: bool = true
 
+var total_pins: int = 5
 var current_pin_index: int = 0
-var time_passed: float = 0.0
+var pin_nodes = []
 
-# Налаштування складності
-var pin_speed: float = 8.0 
-var sweet_spot_min: float = 0.0
-var sweet_spot_max: float = 0.0
+var stat_mod_cache: int = 0
+var time_limit_cache: int = 30
+var initialized_from_code: bool = false
 
 func _ready():
-	# Підключаємо кнопку та пробіл
-	action_btn.pressed.connect(_on_action_pressed)
-	
-	# Тимчасовий запуск для тестування самої сцени (якщо запустити її через F6).
-	# Під час реальної гри MainBoard викличе initialize() з реальними статами.
-	if get_parent() == get_tree().root:
-		initialize(0) # Тестуємо з DEX модом +2
+	if get_parent() == get_tree().root and not initialized_from_code:
+		initialize(0, 30)
+	else:
+		_setup_tumbler(stat_mod_cache, time_limit_cache)
 
-# --- ІНІЦІАЛІЗАЦІЯ ВІД MAINBOARD ---
-func initialize(dex_modifier: int, time_limit: int = 30): # Add time_limit here!
+func initialize(stat_modifier: int, time_limit: int = 30):
+	stat_mod_cache = stat_modifier
+	time_limit_cache = time_limit
+	initialized_from_code = true
+	
+	if is_inside_tree():
+		_setup_tumbler(stat_mod_cache, time_limit_cache)
+
+func _setup_tumbler(stat_modifier: int, time_limit: int):
 	time_left = float(time_limit)
-	timer_bar.max_value = time_left
-	timer_bar.value = time_left
+	if timer_bar:
+		timer_bar.max_value = time_left
+		timer_bar.value = time_left
+		
+	# Scale pin count based on stats: Lower stats = more pins (harder), higher stats = fewer pins
+	total_pins = clampi(12 - stat_modifier, 3, 12)
+	if title_label:
+		title_label.text = "Lockpicking... (" + str(total_pins) + " Pins)"
+		
+	_generate_pins()
+
+func _generate_pins():
+	# If PinsGrid doesn't exist or isn't assigned, create it via code to prevent blank screens
+	if not pins_grid:
+		pins_grid = HBoxContainer.new()
+		pins_grid.name = "PinsGrid"
+		pins_grid.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		pins_grid.offset_left = 20
+		pins_grid.offset_top = 70
+		pins_grid.offset_right = -20
+		pins_grid.offset_bottom = -20
+		$MarginContainer/VBoxContainer.add_child(pins_grid)
 	
-	var base_speed = 12.0
-	pin_speed = clampf(base_speed - (dex_modifier * 1.5), 4.0, 20.0)
+	for child in pins_grid.get_children():
+		child.queue_free()
+	pin_nodes.clear()
 	
-	# 1. Розрахунок кількості пінів (Чим вищий DEX, тим менше пінів. Мінімум 3)
-	var total_pins = clampi(10 - dex_modifier, 3, 10)
+	# Configure container properties
+	if pins_grid is BoxContainer:
+		pins_grid.alignment = BoxContainer.ALIGNMENT_CENTER
 	
-	# 2. Розрахунок "Зеленої зони" (Чим вищий DEX, тим ширша зона)
-	var sweet_spot_width = 15.0 + (dex_modifier * 5.0) 
-	sweet_spot_min = 50.0 - (sweet_spot_width / 2.0)
-	sweet_spot_max = 50.0 + (sweet_spot_width / 2.0)
-	
-	title_label.text = "Lockpicking... (%s Pins)" % total_pins
-	
-	# 3. Динамічна генерація пінів
 	for i in range(total_pins):
-		var pin = ProgressBar.new()
-		pin.fill_mode = ProgressBar.FILL_BOTTOM_TO_TOP
-		pin.custom_minimum_size = Vector2(40, 150)
-		pin.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		pin.show_percentage = false
-		pin_container.add_child(pin)
-	
-	pin_container.draw.connect(_draw_sweet_spot)
-	
-	if get_parent() == get_tree().root:
-		pin_container.queue_redraw()
-	
+		# Create a visual container for each pin column
+		var pin_wrapper = Control.new()
+		pin_wrapper.custom_minimum_size = Vector2(35, 230)
+		pin_wrapper.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		
+		# Background track
+		var bg = ColorRect.new()
+		bg.color = Color(0.05, 0.08, 0.05, 0.9)
+		bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		pin_wrapper.add_child(bg)
+		
+		# Sweet spot zone (randomized vertical range)
+		var sweet_spot = ColorRect.new()
+		sweet_spot.color = Color(0.1, 0.5, 0.2, 0.9)
+		sweet_spot.custom_minimum_size = Vector2(35, 30)
+		var random_y = randf_range(30.0, 160.0)
+		sweet_spot.position = Vector2(0, random_y)
+		pin_wrapper.add_child(sweet_spot)
+		
+		# Moving pin handle
+		var handle = ColorRect.new()
+		handle.color = Color(0.7, 0.7, 0.7, 1.0)
+		handle.size = Vector2(35, 15)
+		handle.position = Vector2(0, 200)
+		pin_wrapper.add_child(handle)
+		
+		pins_grid.add_child(pin_wrapper)
+		pin_nodes.append({
+			"wrapper": pin_wrapper,
+			"handle": handle,
+			"sweet_spot": sweet_spot,
+			"speed": randf_range(1.5, 3.0),
+			"direction": 1,
+			"locked": false
+		})
+		
+	current_pin_index = 0
+	_update_active_pin_visuals()
+
 
 func _process(delta):
 	if not minigame_active: return
 	
-	# --- TIMER LOGIC ---
 	time_left -= delta
-	timer_bar.value = time_left
-	if time_left <= 0:
-		_fail_minigame()
-		return
-	# Додаємо час для синусоїди
-	time_passed += delta * pin_speed
-	
-	# Рухаємо тільки поточний активний пін
-	if current_pin_index < pin_container.get_child_count():
-		var active_pin = pin_container.get_child(current_pin_index)
+	if timer_bar:
+		timer_bar.value = time_left
 		
-		# sin() повертає значення від -1 до 1. 
-		# Перетворюємо це на відсотки від 0 до 100
-		var wave = (sin(time_passed) + 1.0) / 2.0 
-		active_pin.value = wave * 100.0
+	if time_left <= 0:
+		_fail_minigame("LOCKOUT: TIME EXPIRED")
+		
+	# Animate active pin handles moving up and down
+	if current_pin_index < pin_nodes.size():
+		var p = pin_nodes[current_pin_index]
+		if not p["locked"]:
+			var handle = p["handle"]
+			handle.position.y += p["speed"] * p["direction"] * 150 * delta
+			if handle.position.y <= 0 or handle.position.y >= 235:
+				p["direction"] *= -1
 
-# --- ОБРОБКА ВВОДУ ---
 func _unhandled_input(event):
-	# Дозволяємо гравцю використовувати Пробіл замість кліку мишкою
-	if event is InputEventKey and event.pressed and event.keycode == KEY_SPACE:
-		_on_action_pressed()
-		get_viewport().set_input_as_handled()
+	if not minigame_active: return
+	
+	if event.is_action_pressed("ui_accept") or (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT):
+		_attempt_lock_pin()
 
-func _on_action_pressed():
-	if current_pin_index >= pin_container.get_child_count(): return
+func _attempt_lock_pin():
+	if current_pin_index >= pin_nodes.size(): return
 	
-	var active_pin = pin_container.get_child(current_pin_index)
+	var p = pin_nodes[current_pin_index]
+	var handle = p["handle"]
+	var sweet_spot = p["sweet_spot"]
 	
-	# Перевіряємо, чи потрапив пін у зелену зону
-	if active_pin.value >= sweet_spot_min and active_pin.value <= sweet_spot_max:
-		# УСПІХ!
-		active_pin.modulate = Color(0.2, 1.0, 0.2) # Яскраво-зелений
+	# Check if handle is inside the sweet spot vertical bounds
+	var handle_center = handle.position.y + (handle.size.y / 2.0)
+	var spot_top = sweet_spot.position.y
+	var spot_bottom = spot_top + sweet_spot.size.y
+	
+	if handle_center >= spot_top and handle_center <= spot_bottom:
+		# SUCCESS
+		p["locked"] = true
+		handle.color = Color(0.3, 1.0, 0.4)
 		current_pin_index += 1
 		
-		# Перевіряємо, чи всі піни зламано
-		if current_pin_index >= pin_container.get_child_count():
+		if current_pin_index >= pin_nodes.size():
 			_win_minigame()
+		else:
+			_update_active_pin_visuals()
 	else:
-		# ПРОВАЛ!
-		title_label.text = "CLICK! Pin dropped..."
-		title_label.add_theme_color_override("font_color", Color(1, 0, 0))
-		
-		# Робимо невеличку затримку для візуального покарання (скидаємо прогрес)
-		set_process(false) # Зупиняємо рух
-		active_pin.modulate = Color(1.0, 0.2, 0.2) # Червоний
-		
-		await get_tree().create_timer(0.5).timeout
-		
-		# Скидання
-		current_pin_index = 0
-		time_passed = 0.0
-		title_label.add_theme_color_override("font_color", Color(1, 1, 1))
-		title_label.text = "Lockpicking..."
-		for pin in pin_container.get_children():
-			pin.modulate = Color(1, 1, 1) # Повертаємо стандартний колір
-		set_process(true)
+		# FAILURE (-5 seconds & shake)
+		time_left -= 5.0
+		_trigger_screen_shake()
 
-func _fail_minigame():
-	minigame_active = false
-	title_label.text = "TIME OUT! LOCKOUT TRIGGERED!"
-	title_label.add_theme_color_override("font_color", Color(1, 0, 0))
-	timer_bar.modulate = Color(0.2, 0.2, 0.2) # Darken the bar
-	
-	await get_tree().create_timer(2.0).timeout
-	queue_free()
+func _update_active_pin_visuals():
+	for i in range(pin_nodes.size()):
+		var p = pin_nodes[i]
+		if i == current_pin_index:
+			p["handle"].color = Color(1.0, 0.8, 0.2) # Active gold
+		elif not p["locked"]:
+			p["handle"].color = Color(0.4, 0.4, 0.4) # Inactive
 
 func _win_minigame():
-	minigame_active = false # Stop the timer
-	set_process(false)
-	title_label.text = "ACCESS GRANTED"
-	title_label.add_theme_color_override("font_color", Color(0, 1, 0))
-	action_btn.text = "CLOSE"
-	
-	# Відключаємо стару логіку кнопки і підключаємо нову (просто закрити вікно)
-	action_btn.pressed.disconnect(_on_action_pressed)
-	action_btn.pressed.connect(func(): queue_free())
-	
-	# Відправляємо повідомлення в чат (Опціонально)
-	var main = get_tree().current_scene
-	if main and main.has_method("receive_chat_message"):
-		var msg = "\n[color=green]Successfully picked the lock![/color]"
-		if multiplayer.is_server():
-			main.receive_chat_message(GameState.player_name, msg, GameState.player_color_hex)
-			main.rpc("receive_chat_message", GameState.player_name, msg, GameState.player_color_hex)
-		else:
-			main.rpc_id(1, "request_chat_message", GameState.player_name, msg, GameState.player_color_hex)
+	minigame_active = false
+	minigame_finished.emit(true)
+	if title_label:
+		title_label.text = "LOCK BYPASSED"
+		title_label.add_theme_color_override("font_color", Color(0, 1, 0))
+	await get_tree().create_timer(1.2).timeout
+	queue_free()
 
-func _draw_sweet_spot():
-	# Оскільки ProgressBar заповнюється знизу вгору, 0% - це низ (size.y), а 100% - це верх (0).
-	var y_bottom = pin_container.size.y * (1.0 - (sweet_spot_min / 100.0))
-	var y_top = pin_container.size.y * (1.0 - (sweet_spot_max / 100.0))
-	var zone_height = y_bottom - y_top
-	
-	# Малюємо напівпрозорий зелений прямокутник на всю ширину контейнера
-	pin_container.draw_rect(Rect2(0, y_top, pin_container.size.x, zone_height), Color(0.0, 1.0, 0.0, 0.3))
+func _fail_minigame(msg: String):
+	minigame_active = false
+	minigame_finished.emit(false)
+	if title_label:
+		title_label.text = msg
+		title_label.add_theme_color_override("font_color", Color(1, 0, 0))
+	await get_tree().create_timer(1.5).timeout
+	queue_free()
+
+func _trigger_screen_shake():
+	var tween = create_tween()
+	var margin_node = $MarginContainer
+	if not margin_node: return
+	var original_pos = margin_node.position
+	for i in range(6):
+		var offset = Vector2(randf_range(-12.0, 12.0), randf_range(-12.0, 12.0))
+		tween.tween_property(margin_node, "position", original_pos + offset, 0.04)
+	tween.tween_property(margin_node, "position", original_pos, 0.04)

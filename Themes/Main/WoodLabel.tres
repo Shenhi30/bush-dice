@@ -1,0 +1,24 @@
+[gd_resource type="Theme" format=3 uid="uid://db5a3708dwskn"]
+
+[ext_resource type="Texture2D" uid="uid://jhkkc418j1o8" path="res://Assets/UI/wood_button_normal.png" id="1_tex"]
+[ext_resource type="FontFile" uid="uid://dvpkfb7dbepkm" path="res://Assets/Fonts/Roboto-VariableFont_wdth,wght.ttf" id="2_font"]
+
+[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_label"]
+content_margin_left = 24.0
+content_margin_top = 4.0
+content_margin_right = 24.0
+content_margin_bottom = 4.0
+texture = ExtResource("1_tex")
+texture_margin_left = 18.0
+texture_margin_top = 9.0
+texture_margin_right = 18.0
+texture_margin_bottom = 9.0
+modulate_color = Color(0.55, 0.45, 0.38, 1)
+
+[resource]
+Label/colors/font_color = Color(0.988235, 0.843137, 0.494118, 1)
+Label/colors/font_outline_color = Color(0.117647, 0.0588235, 0.0196078, 0.9)
+Label/constants/outline_size = 2
+Label/font_sizes/font_size = 18
+Label/fonts/font = ExtResource("2_font")
+Label/styles/normal = SubResource("StyleBoxTexture_label")

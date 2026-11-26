@@ -2,54 +2,72 @@
 
 [ext_resource type="StyleBox" uid="uid://bwqvnpqvn36dn" path="res://Themes/Main/Brown_box_flat.tres" id="1_0h3dd"]
 [ext_resource type="Script" uid="uid://cfeiv5euexgr1" path="res://Scripts/QuestWindow.gd" id="2_n50ji"]
+[ext_resource type="Theme" path="res://Themes/Main/WoodButtonCompact.tres" id="3_wood"]
 
 [node name="QuestWindow" type="PanelContainer" unique_id=123893291]
 offset_top = 36.0
-offset_right = 300.0
-offset_bottom = 280.0
+offset_right = 380.0
+offset_bottom = 340.0
 theme_override_styles/panel = ExtResource("1_0h3dd")
+theme = ExtResource("3_wood")
 script = ExtResource("2_n50ji")
 
-[node name="HBoxContainer" type="HBoxContainer" parent="." unique_id=498487331]
+[node name="VBoxContainer" type="VBoxContainer" parent="."]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Header" type="HBoxContainer" parent="VBoxContainer"]
+custom_minimum_size = Vector2(0, 30)
 layout_mode = 2
 
-[node name="LeftColumn" type="VBoxContainer" parent="HBoxContainer" unique_id=134911575]
+[node name="TitleLabel" type="Label" parent="VBoxContainer/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+text = "Quest Log"
+
+[node name="CloseBtn" type="Button" parent="VBoxContainer/Header"]
+layout_mode = 2
+text = "X"
+
+[node name="HBoxContainer" type="HBoxContainer" parent="VBoxContainer" unique_id=498487331]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="LeftColumn" type="VBoxContainer" parent="VBoxContainer/HBoxContainer" unique_id=134911575]
 layout_mode = 2
 
-[node name="QuestList" type="ItemList" parent="HBoxContainer/LeftColumn" unique_id=192386022]
+[node name="QuestList" type="ItemList" parent="VBoxContainer/HBoxContainer/LeftColumn" unique_id=192386022]
 custom_minimum_size = Vector2(150, 200)
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="NewQuestBtn" type="Button" parent="HBoxContainer/LeftColumn" unique_id=2095477299]
+[node name="NewQuestBtn" type="Button" parent="VBoxContainer/HBoxContainer/LeftColumn" unique_id=2095477299]
 layout_mode = 2
 text = "New "
-flat = true
 
-[node name="RightColumn" type="VBoxContainer" parent="HBoxContainer" unique_id=1228973057]
+[node name="RightColumn" type="VBoxContainer" parent="VBoxContainer/HBoxContainer" unique_id=1228973057]
 layout_mode = 2
 
-[node name="QuestName" type="LineEdit" parent="HBoxContainer/RightColumn" unique_id=1779408387]
+[node name="QuestName" type="LineEdit" parent="VBoxContainer/HBoxContainer/RightColumn" unique_id=1779408387]
 layout_mode = 2
 placeholder_text = "Quest Name"
 flat = true
 
-[node name="QuestDesc" type="TextEdit" parent="HBoxContainer/RightColumn" unique_id=256314135]
+[node name="QuestDesc" type="TextEdit" parent="VBoxContainer/HBoxContainer/RightColumn" unique_id=256314135]
 custom_minimum_size = Vector2(200, 100)
 layout_mode = 2
 placeholder_text = "Description for quest"
 
-[node name="PinCheckBox" type="CheckBox" parent="HBoxContainer/RightColumn" unique_id=946175160]
+[node name="PinCheckBox" type="CheckBox" parent="VBoxContainer/HBoxContainer/RightColumn" unique_id=946175160]
 layout_mode = 2
 text = "Pin"
 flat = true
 
-[node name="SaveQuestBtn" type="Button" parent="HBoxContainer/RightColumn" unique_id=255528963]
+[node name="SaveQuestBtn" type="Button" parent="VBoxContainer/HBoxContainer/RightColumn" unique_id=255528963]
 layout_mode = 2
 text = "Save"
-flat = true
 
-[node name="DeleteQuestBtn" type="Button" parent="HBoxContainer/RightColumn" unique_id=520883783]
+[node name="DeleteQuestBtn" type="Button" parent="VBoxContainer/HBoxContainer/RightColumn" unique_id=520883783]
 layout_mode = 2
 text = "Delete"
-flat = true

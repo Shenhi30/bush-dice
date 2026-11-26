@@ -1,6 +1,7 @@
 [gd_scene format=3 uid="uid://x4os0solslq1"]
 
 [ext_resource type="Script" uid="uid://10t4ega3vugo" path="res://Scripts/Auth_screen.gd" id="1_f51bv"]
+[ext_resource type="Theme" path="res://Themes/Main/WoodButton.tres" id="2_wood"]
 
 [node name="AuthScreen" type="Control" unique_id=822288732]
 layout_mode = 3
@@ -21,6 +22,7 @@ offset_left = 350.0
 offset_top = 103.0
 offset_right = 786.0
 offset_bottom = 539.0
+theme = ExtResource("2_wood")
 
 [node name="UsernameInput" type="LineEdit" parent="VBoxContainer" unique_id=1977807239]
 layout_mode = 2

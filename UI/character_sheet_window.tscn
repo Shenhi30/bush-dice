@@ -3,6 +3,7 @@
 [ext_resource type="StyleBox" uid="uid://bwqvnpqvn36dn" path="res://Themes/Main/Brown_box_flat.tres" id="1_iw3qj"]
 [ext_resource type="Script" uid="uid://bgek320ckesoi" path="res://Scripts/character_sheet_window.gd" id="2_b28lc"]
 [ext_resource type="PackedScene" uid="uid://2a0h66dq03v1" path="res://UI/add_blueprint_popup.tscn" id="3_nbny1"]
+[ext_resource type="Theme" path="res://Themes/Main/WoodButtonCompact.tres" id="4_wood"]
 
 [node name="CharacterSheetWindow" type="PanelContainer" unique_id=1768750079]
 offset_left = 136.0
@@ -12,6 +13,7 @@ offset_bottom = 647.0
 size_flags_horizontal = 3
 size_flags_vertical = 3
 theme_override_styles/panel = ExtResource("1_iw3qj")
+theme = ExtResource("4_wood")
 script = ExtResource("2_b28lc")
 
 [node name="MarginContainer" type="MarginContainer" parent="." unique_id=989703984]

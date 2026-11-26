@@ -10,6 +10,7 @@
 [ext_resource type="Script" uid="uid://5utvh4al0krb" path="res://Scripts/QuestTracker.gd" id="7_d5o86"]
 [ext_resource type="PackedScene" uid="uid://qdo3ljfkise1" path="res://Scenes/inventory_window.tscn" id="7_wxlku"]
 [ext_resource type="PackedScene" uid="uid://c7o6bdrv70rlo" path="res://UI/character_sheet_window.tscn" id="8_cvtiy"]
+[ext_resource type="Theme" uid="uid://2m0kkg4wm53t" path="res://Themes/Main/WoodButtonCompact.tres" id="9_wood"]
 
 [sub_resource type="Gradient" id="Gradient_m4kfr"]
 
@@ -39,6 +40,8 @@ texture = SubResource("GradientTexture2D_d5o86")
 
 [node name="WallLayer" type="Node2D" parent="." unique_id=293265149]
 
+[node name="DoorLayer" type="Node2D" parent="." unique_id=191969888]
+
 [node name="TokenLayer" type="Node2D" parent="." unique_id=2085070927]
 
 [node name="Token" parent="TokenLayer" unique_id=1895161753 instance=ExtResource("2_6bsxh")]
@@ -64,8 +67,10 @@ anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
 offset_left = -155.0
+offset_top = 31.0
 offset_bottom = 648.0
 grow_horizontal = 0
+theme = ExtResource("9_wood")
 current_tab = 0
 
 [node name="InitiativeTracker" type="PanelContainer" parent="UILayer/TabContainer" unique_id=808262133]
@@ -86,7 +91,6 @@ layout_mode = 2
 [node name="RollInitBtn" type="Button" parent="UILayer/TabContainer/InitiativeTracker/MarginContainer/VBoxContainer" unique_id=68125049]
 layout_mode = 2
 text = "Roll Initiative"
-flat = true
 autowrap_mode = 3
 
 [node name="ResetInitBtn" type="Button" parent="UILayer/TabContainer/InitiativeTracker/MarginContainer/VBoxContainer" unique_id=222054577]
@@ -141,7 +145,6 @@ flat = true
 [node name="SendBtn" type="Button" parent="UILayer/TabContainer/ChatPanel/VBoxContainer/HBoxContainer" unique_id=2079632110]
 layout_mode = 2
 text = "Send"
-flat = true
 
 [node name="PlayerListPanel" type="Panel" parent="UILayer/TabContainer" unique_id=1391938670]
 visible = false
@@ -167,6 +170,7 @@ offset_right = 405.0
 grow_horizontal = 2
 grow_vertical = 0
 mouse_filter = 1
+theme = ExtResource("9_wood")
 
 [node name="HBoxContainer" type="HBoxContainer" parent="UILayer/DiceRollPanel" unique_id=1282694786]
 layout_mode = 2
@@ -223,6 +227,7 @@ offset_right = -142.0
 grow_horizontal = 2
 grow_vertical = 0
 mouse_filter = 1
+theme = ExtResource("9_wood")
 script = ExtResource("7_d5o86")
 
 [node name="InventoryWindow" parent="UILayer" unique_id=2073021464 instance=ExtResource("7_wxlku")]
@@ -242,8 +247,8 @@ anchor_bottom = 1.0
 offset_top = -40.0
 offset_right = 111.0
 grow_vertical = 0
+theme = ExtResource("9_wood")
 text = "Back to menu"
-flat = true
 
 [node name="BackgroundDropLayer" type="CanvasLayer" parent="." unique_id=471475110]
 layer = 9

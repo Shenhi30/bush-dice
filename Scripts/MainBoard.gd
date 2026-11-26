@@ -1,7 +1,7 @@
 extends Node2D
 
 # --- MODES & TOOLS ---
-enum Mode { SELECT, DRAW_WALL, ERASE_WALL, MEASURE }
+enum Mode { SELECT, DRAW_WALL, ERASE_WALL, MEASURE, PLACE_DOOR }
 var current_mode: Mode = Mode.SELECT
 
 enum MeasureShape { LINE, CIRCLE, CONE }
@@ -21,10 +21,28 @@ var is_loading_game: bool = false
 
 @onready var quest_tracker = $UILayer/CodeQuestTracker
 @onready var wall_layer = $WallLayer
+@onready var door_layer = $DoorLayer
 @onready var map_layer = $MapLayer/MapSprite
 @onready var gm_layer = $GMLayer
 @onready var token_layer = $TokenLayer
 @onready var darkness = $Darkness
+
+# --- DOORS & LOOTING ---
+const DOOR_SCRIPT = preload("res://Scripts/door.gd")
+const LOOT_WINDOW_SCENE = preload("res://Scenes/loot_window.tscn")
+const WOOD_BUTTON_COMPACT = preload("res://Themes/Main/WoodButtonCompact.tres")
+
+var doors_by_id: Dictionary = {}
+var door_popup: PopupMenu
+var door_rename_dialog: ConfirmationDialog
+var door_rename_input: LineEdit
+var active_door = null
+var door_preview_start: Vector2 = Vector2.ZERO
+var door_preview_end: Vector2 = Vector2.ZERO
+var door_preview_visible: bool = false
+
+var loot_window = null
+var active_loot_container_id: String = ""
 
 # --- CHAT LOG NODES ---
 @onready var chat_log = $UILayer/TabContainer/ChatPanel/VBoxContainer/ScrollContainer/ChatLog
@@ -80,6 +98,11 @@ var aoe_input: SpinBox
 const TOKEN_SCENE = preload("res://Scenes/token.tscn")
 
 func _ready():
+	# --- LOOT / DOOR DATA (safe defaults for old save files) ---
+	if not CampaignManager.campaign_data.has("loot_containers"):
+		CampaignManager.campaign_data["loot_containers"] = {}
+	doors_by_id.clear()
+
 	# --- CHAT FIXES ---
 	chat_log.text = "" # Wipes the placeholder text
 	chat_log.scroll_following = true # Forces the chat to always scroll down
@@ -184,6 +207,8 @@ func _ready():
 		call_deferred("_on_gm_dashboard_load_requested", CampaignManager.current_save_path)
 		
 	_setup_aoe_dialog()
+	_setup_door_ui()
+	_setup_loot_window()
 
 
 func _get_token_under_mouse(mouse_pos: Vector2):
@@ -205,6 +230,8 @@ func _unhandled_input(event):
 			_change_tool_shortcut(Mode.ERASE_WALL)
 		elif event.keycode == KEY_4:
 			_change_tool_shortcut(Mode.MEASURE)
+		elif event.keycode == KEY_5 and GameState.is_gm_mode:
+			_change_tool_shortcut(Mode.PLACE_DOOR)
 	
 	if current_mode == Mode.SELECT:
 		# WASD MOVEMENT
@@ -268,6 +295,17 @@ func _unhandled_input(event):
 			
 				# Stop the click from accidentally selecting a token underneath the mouse
 				get_viewport().set_input_as_handled() 
+				return
+
+		# --- DOOR INTERACTION (checked before tokens so doors win the click) ---
+		if event is InputEventMouseButton and event.pressed:
+			var clicked_door = _get_door_under_mouse(get_global_mouse_position())
+			if clicked_door:
+				if event.button_index == MOUSE_BUTTON_LEFT:
+					_on_door_left_clicked(clicked_door)
+				elif event.button_index == MOUSE_BUTTON_RIGHT:
+					_show_door_menu(clicked_door)
+				get_viewport().set_input_as_handled()
 				return
 
 		# MOUSE CLICKS
@@ -386,6 +424,18 @@ func _unhandled_input(event):
 			_sync_local_measurement() # Оновлюємо лінійку для всіх під час руху мишки!
 			token_layer.queue_redraw()
 
+	elif current_mode == Mode.PLACE_DOOR:
+		if event is InputEventMouseMotion:
+			_update_door_preview()
+		elif event is InputEventMouseButton:
+			if event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+				_place_door_at_mouse()
+			elif event.button_index == MOUSE_BUTTON_RIGHT and event.pressed and gm_dashboard:
+				# Quick orientation flip without leaving the tool.
+				if gm_dashboard.door_vertical_check:
+					gm_dashboard.door_vertical_check.button_pressed = not gm_dashboard.door_vertical_check.button_pressed
+				_update_door_preview()
+
 
 func _change_tool_shortcut(new_mode: int):
 	# Don't try to change the tool manually here. 
@@ -431,6 +481,12 @@ func _on_token_layer_draw():
 		
 	if is_drawing_wall:
 		token_layer.draw_line(wall_start_pos, wall_end_pos, Color.RED, 4.0)
+
+	if current_mode == Mode.PLACE_DOOR and door_preview_visible:
+		token_layer.draw_line(door_preview_start, door_preview_end, Color(1.0, 0.8, 0.2, 0.35), 20.0)
+		token_layer.draw_line(door_preview_start, door_preview_end, Color(1.0, 0.85, 0.3, 0.9), 4.0)
+		token_layer.draw_circle(door_preview_start, 5.0, Color(1.0, 0.85, 0.3, 0.9))
+		token_layer.draw_circle(door_preview_end, 5.0, Color(1.0, 0.85, 0.3, 0.9))
 		
 	# --- DRAW NETWORK MEASUREMENTS (Інші гравці) ---
 	for peer_id in network_measurements.keys():
@@ -737,10 +793,14 @@ func _on_gm_dashboard_map_loaded(file_path: String):
 func _on_gm_dashboard_tool_mode_changed(mode_index: int) -> void:
 	current_mode = mode_index as Mode
 	is_drawing_wall = false
+	door_preview_visible = false
 	
 	_clear_selection()
 	is_dragging_tokens = false
 	is_drawing_box = false
+	
+	if current_mode == Mode.PLACE_DOOR:
+		_update_door_preview()
 	
 	queue_redraw()
 	if token_layer:
@@ -809,7 +869,7 @@ func _on_gm_dashboard_save_requested(path: String):
 	var current_scene_id = CampaignManager.campaign_data["active_scene_id"]
 	var scene_data = {
 		"map_image_path": current_map_path, "map_scale": gm_dashboard.map_scale_spin_box.value,
-		"tokens": [], "walls": []
+		"tokens": [], "walls": [], "doors": _collect_doors_data()
 	}
 	for token in token_layer.get_children():
 		if "data" in token:
@@ -863,6 +923,8 @@ func _on_gm_dashboard_load_requested(path: String):
 	
 	if not CampaignManager.campaign_data.has("backpacks"):
 		CampaignManager.campaign_data["backpacks"] = {}
+	if not CampaignManager.campaign_data.has("loot_containers"):
+		CampaignManager.campaign_data["loot_containers"] = {}
 	if not CampaignManager.campaign_data.has("pc_vault"):
 		CampaignManager.campaign_data["pc_vault"] = {}
 		
@@ -870,6 +932,7 @@ func _on_gm_dashboard_load_requested(path: String):
 		
 	for token in token_layer.get_children(): token.queue_free()
 	for wall in wall_layer.get_children(): wall.queue_free()
+	_clear_doors()
 	selected_tokens.clear()
 	
 	var active_scene = CampaignManager.campaign_data["active_scene_id"]
@@ -894,6 +957,9 @@ func _on_gm_dashboard_load_requested(path: String):
 		
 	for w_data in scene_data.get("walls", []):
 		_spawn_permanent_wall(Vector2(w_data["start_x"], w_data["start_y"]), Vector2(w_data["end_x"], w_data["end_y"]))
+		
+	for d_data in scene_data.get("doors", []):
+		_spawn_door_from_data(d_data)
 		
 	if CampaignManager.campaign_data.has("quests"):
 		get_tree().call_group("quest_ui", "refresh_quests")
@@ -924,7 +990,7 @@ func _on_gm_dashboard_scene_switched(new_scene_id: String):
 	
 	var scene_data = {
 		"map_image_path": current_map_path, "map_scale": gm_dashboard.map_scale_spin_box.value,
-		"tokens": [], "walls": []
+		"tokens": [], "walls": [], "doors": _collect_doors_data()
 	}
 	for token in token_layer.get_children():
 		if "data" in token:
@@ -941,6 +1007,7 @@ func _on_gm_dashboard_scene_switched(new_scene_id: String):
 	
 	for token in token_layer.get_children(): token.queue_free()
 	for wall in wall_layer.get_children(): wall.queue_free()
+	_clear_doors()
 	selected_tokens.clear()
 	
 	CampaignManager.campaign_data["active_scene_id"] = new_scene_id
@@ -967,6 +1034,9 @@ func _on_gm_dashboard_scene_switched(new_scene_id: String):
 	for w_data in new_scene_data.get("walls", []):
 		_spawn_permanent_wall(Vector2(w_data["start_x"], w_data["start_y"]), Vector2(w_data["end_x"], w_data["end_y"]))
 
+	for d_data in new_scene_data.get("doors", []):
+		_spawn_door_from_data(d_data)
+
 	# SEAMLESS SCENE SWITCH BROADCAST
 	if multiplayer.is_server():
 		var global_quests = CampaignManager.campaign_data.get("quests", [])
@@ -975,7 +1045,7 @@ func _on_gm_dashboard_scene_switched(new_scene_id: String):
 func _on_gm_dashboard_create_new_scene_requested():
 	var scene_count = CampaignManager.campaign_data["scenes"].size() + 1
 	var new_id = "map_" + str(scene_count)
-	CampaignManager.campaign_data["scenes"][new_id] = {"map_image_path": "", "map_scale": 1.0, "tokens": [], "walls": []}
+	CampaignManager.campaign_data["scenes"][new_id] = {"map_image_path": "", "map_scale": 1.0, "tokens": [], "walls": [], "doors": []}
 	
 	_on_gm_dashboard_scene_switched(new_id) # Switch the engine first
 	gm_dashboard.refresh_scene_dropdown() # Then rebuild the UI
@@ -997,6 +1067,7 @@ func _on_gm_dashboard_spawn_party_requested():
 
 func _setup_player_toolbar():
 	player_toolbar = PanelContainer.new()
+	player_toolbar.theme = WOOD_BUTTON_COMPACT
 	
 	# Додаємо трохи простору навколо кнопок
 	var margin = MarginContainer.new()
@@ -1356,7 +1427,7 @@ func request_board_sync():
 	var current_scene_id = CampaignManager.campaign_data["active_scene_id"]
 	var live_scene_data = {
 		"map_image_path": current_map_path, "map_scale": gm_dashboard.map_scale_spin_box.value,
-		"tokens": [], "walls": []
+		"tokens": [], "walls": [], "doors": _collect_doors_data()
 	}
 	
 	for token in token_layer.get_children():
@@ -1382,7 +1453,11 @@ func receive_board_sync(scene_id: String, scene_data: Dictionary, quests_data: D
 	# WIPE GHOST TOWN
 	for token in token_layer.get_children(): token.queue_free()
 	for wall in wall_layer.get_children(): wall.queue_free()
+	_clear_doors()
 	selected_tokens.clear()
+	
+	if not CampaignManager.campaign_data.has("loot_containers"):
+		CampaignManager.campaign_data["loot_containers"] = {}
 	
 	# MATCH SCENE DROPDOWN
 	# Safely update the new custom scene button text instead of the old dropdown
@@ -1415,6 +1490,9 @@ func receive_board_sync(scene_id: String, scene_data: Dictionary, quests_data: D
 		
 	for w_data in scene_data.get("walls", []):
 		_spawn_permanent_wall(Vector2(w_data["start_x"], w_data["start_y"]), Vector2(w_data["end_x"], w_data["end_y"]))
+
+	for d_data in scene_data.get("doors", []):
+		_spawn_door_from_data(d_data)
 
 # --- WALL SYNCING ---
 func broadcast_wall_spawn(start: Vector2, end: Vector2):
@@ -1760,6 +1838,702 @@ func sync_single_backpack(target_uuid: String, updated_items: Array):
 	if inv_window.visible and currently_viewed_backpack_uuid == target_uuid:
 		var char_name = inv_window.title_label.text.replace("'s Backpack", "")
 		inv_window.populate(char_name, updated_items)
+
+# ==========================================
+# INTERACTIVE DOORS
+# ==========================================
+func _setup_door_ui():
+	door_popup = PopupMenu.new()
+	door_popup.name = "DoorPopup"
+	$UILayer.add_child(door_popup)
+	door_popup.id_pressed.connect(_on_door_menu_id_pressed)
+
+	door_rename_dialog = ConfirmationDialog.new()
+	door_rename_dialog.name = "RenameDoorDialog"
+	door_rename_dialog.title = "Rename Door"
+	door_rename_dialog.ok_button_text = "Rename"
+	$UILayer.add_child(door_rename_dialog)
+
+	door_rename_input = LineEdit.new()
+	door_rename_input.custom_minimum_size = Vector2(320, 32)
+	door_rename_input.placeholder_text = "Door name"
+	door_rename_dialog.add_child(door_rename_input)
+	door_rename_dialog.confirmed.connect(_on_door_rename_confirmed)
+
+func _update_door_preview():
+	if current_mode != Mode.PLACE_DOOR or not GameState.is_gm_mode:
+		door_preview_visible = false
+		if token_layer:
+			token_layer.queue_redraw()
+		return
+
+	var mouse_pos = get_global_mouse_position()
+	var grid_size = 64.0
+	var half = grid_size / 2.0
+	var vertical = false
+	if gm_dashboard and gm_dashboard.door_vertical_check:
+		vertical = gm_dashboard.door_vertical_check.button_pressed
+
+	# Shift quickly flips the door orientation while placing.
+	if Input.is_key_pressed(KEY_SHIFT):
+		vertical = not vertical
+
+	if vertical:
+		var line_x = round(mouse_pos.x / grid_size) * grid_size
+		var cell_y = floor(mouse_pos.y / grid_size) * grid_size + half
+		door_preview_start = Vector2(line_x, cell_y - half)
+		door_preview_end = Vector2(line_x, cell_y + half)
+	else:
+		var cell_x = floor(mouse_pos.x / grid_size) * grid_size + half
+		var line_y = round(mouse_pos.y / grid_size) * grid_size
+		door_preview_start = Vector2(cell_x - half, line_y)
+		door_preview_end = Vector2(cell_x + half, line_y)
+
+	door_preview_visible = true
+	token_layer.queue_redraw()
+
+func _place_door_at_mouse():
+	if not GameState.is_gm_mode:
+		return
+
+	_update_door_preview()
+	if not door_preview_visible:
+		return
+
+	var vertical = false
+	if gm_dashboard and gm_dashboard.door_vertical_check:
+		vertical = gm_dashboard.door_vertical_check.button_pressed
+	if Input.is_key_pressed(KEY_SHIFT):
+		vertical = not vertical
+
+	var locked = false
+	if gm_dashboard and gm_dashboard.door_locked_check:
+		locked = gm_dashboard.door_locked_check.button_pressed
+	if Input.is_key_pressed(KEY_CTRL):
+		locked = true
+
+	var secret = false
+	if gm_dashboard and gm_dashboard.door_secret_check:
+		secret = gm_dashboard.door_secret_check.button_pressed
+
+	var difficulty = 2
+	if gm_dashboard and gm_dashboard.door_lock_spin:
+		difficulty = int(gm_dashboard.door_lock_spin.value)
+
+	var door_data = {
+		"door_id": "door_" + str(Time.get_ticks_msec()) + "_" + str(randi() % 1000),
+		"start_x": door_preview_start.x,
+		"start_y": door_preview_start.y,
+		"end_x": door_preview_end.x,
+		"end_y": door_preview_end.y,
+		"is_open": false,
+		"is_locked": locked,
+		"is_secret": secret,
+		"label": "Door",
+		"lock_difficulty": difficulty
+	}
+
+	if multiplayer.is_server():
+		_server_spawn_door(door_data)
+	else:
+		rpc_id(1, "request_door_spawn", door_data)
+
+func _server_spawn_door(data: Dictionary):
+	_spawn_door_from_data(data)
+	_persist_doors_to_scene()
+	rpc("receive_door_spawn", data)
+
+func _spawn_door_from_data(data: Dictionary):
+	var door_id = str(data.get("door_id", ""))
+	if door_id == "":
+		door_id = "door_" + str(Time.get_ticks_msec()) + "_" + str(randi() % 1000)
+		data["door_id"] = door_id
+
+	var existing = doors_by_id.get(door_id)
+	if existing and is_instance_valid(existing):
+		existing.setup(data)
+		return existing
+
+	var door = DOOR_SCRIPT.new()
+	door.name = door_id
+	door.setup(data)
+	door_layer.add_child(door)
+	doors_by_id[door_id] = door
+	return door
+
+func _collect_doors_data() -> Array:
+	var result: Array = []
+	if not door_layer:
+		return result
+
+	for door in door_layer.get_children():
+		if is_instance_valid(door) and door.has_method("to_dict"):
+			result.append(door.to_dict())
+	return result
+
+func _clear_doors():
+	if door_layer:
+		for door in door_layer.get_children():
+			door.queue_free()
+	doors_by_id.clear()
+	active_door = null
+	door_preview_visible = false
+
+func _persist_doors_to_scene():
+	var scene_id = str(CampaignManager.campaign_data.get("active_scene_id", ""))
+	if scene_id == "":
+		return
+	var scenes = CampaignManager.campaign_data.get("scenes", {})
+	if typeof(scenes) == TYPE_DICTIONARY and scenes.has(scene_id):
+		scenes[scene_id]["doors"] = _collect_doors_data()
+
+func _get_door_under_mouse(mouse_pos: Vector2):
+	var best_door = null
+	var min_dist = 20.0
+
+	for door in door_layer.get_children():
+		if not is_instance_valid(door) or not door.visible:
+			continue
+		if door.is_secret and not GameState.is_gm_mode:
+			continue
+
+		var dist = door.distance_to_segment(mouse_pos)
+		if dist < min_dist:
+			min_dist = dist
+			best_door = door
+
+	return best_door
+
+func _get_player_token(player_name: String):
+	for token in token_layer.get_children():
+		if not ("data" in token):
+			continue
+		if str(token.data.get("owner_id", "")).to_lower() == player_name.to_lower():
+			return token
+	return null
+
+func _player_is_near_door(door) -> bool:
+	if GameState.is_gm_mode:
+		return true
+
+	var token = _get_player_token(GameState.player_name)
+	if token == null:
+		return true
+
+	return door.distance_to_segment(token.global_position) <= 160.0
+
+func _on_door_left_clicked(door):
+	if not is_instance_valid(door):
+		return
+	if door.is_secret and not GameState.is_gm_mode:
+		return
+	if not _player_is_near_door(door):
+		print("You are too far away from that door.")
+		return
+
+	if door.is_locked and not GameState.is_gm_mode:
+		_start_door_lockpick(door)
+		return
+
+	_apply_door_state(door, "is_open", not door.is_open)
+
+func _show_door_menu(door):
+	if not GameState.is_gm_mode or not is_instance_valid(door):
+		return
+
+	active_door = door
+	door_popup.clear()
+	door_popup.add_item("Close Door" if door.is_open else "Open Door", 0)
+	door_popup.add_item("Unlock Door" if door.is_locked else "Lock Door", 1)
+	door_popup.add_item("Make Secret" if not door.is_secret else "Reveal Door", 2)
+	door_popup.add_item("Rename...", 3)
+	door_popup.add_separator()
+	door_popup.add_item("Delete Door", 4)
+
+	var screen_pos = DisplayServer.mouse_get_position()
+	door_popup.popup(Rect2i(screen_pos, Vector2i(1, 1)))
+
+func _on_door_menu_id_pressed(id: int):
+	if active_door == null or not is_instance_valid(active_door):
+		return
+
+	match id:
+		0:
+			_apply_door_state(active_door, "is_open", not active_door.is_open)
+		1:
+			_apply_door_state(active_door, "is_locked", not active_door.is_locked)
+		2:
+			_apply_door_state(active_door, "is_secret", not active_door.is_secret)
+		3:
+			door_rename_input.text = active_door.label
+			door_rename_dialog.popup_centered()
+			door_rename_input.grab_focus()
+			door_rename_input.select_all()
+		4:
+			_delete_door(active_door)
+
+func _on_door_rename_confirmed():
+	if active_door == null or not is_instance_valid(active_door):
+		return
+	var new_label = door_rename_input.text.strip_edges()
+	if new_label == "":
+		new_label = "Door"
+	_apply_door_state(active_door, "label", new_label)
+
+func _apply_door_state(door, key: String, value):
+	if not is_instance_valid(door):
+		return
+
+	door.apply_state(key, value)
+
+	if multiplayer.is_server():
+		rpc("receive_door_state", door.door_id, key, value)
+		_persist_doors_to_scene()
+	else:
+		rpc_id(1, "request_door_state", door.door_id, key, value)
+
+func _delete_door(door):
+	if not is_instance_valid(door):
+		return
+
+	var door_id = door.door_id
+	doors_by_id.erase(door_id)
+	door.queue_free()
+	active_door = null
+
+	if multiplayer.is_server():
+		rpc("receive_door_delete", door_id)
+		_persist_doors_to_scene()
+	else:
+		rpc_id(1, "request_door_delete", door_id)
+
+func _sender_is_gm(peer_id: int) -> bool:
+	if peer_id == 1:
+		return true
+	if connected_players.has(peer_id):
+		return str(connected_players[peer_id].get("role", "PLAYER")) == "GM"
+	return false
+
+# --- DOOR NETWORK REQUESTS ---
+@rpc("any_peer", "call_remote", "reliable")
+func request_door_spawn(data: Dictionary):
+	if not multiplayer.is_server():
+		return
+	var sender_id = multiplayer.get_remote_sender_id()
+	if not _sender_is_gm(sender_id):
+		return
+	_server_spawn_door(data)
+
+@rpc("authority", "call_remote", "reliable")
+func receive_door_spawn(data: Dictionary):
+	_spawn_door_from_data(data)
+	_persist_doors_to_scene()
+
+@rpc("any_peer", "call_remote", "reliable")
+func request_door_state(door_id: String, key: String, value):
+	if not multiplayer.is_server():
+		return
+	var sender_id = multiplayer.get_remote_sender_id()
+	var is_gm = _sender_is_gm(sender_id)
+	var door = doors_by_id.get(door_id)
+	if not door or not is_instance_valid(door):
+		return
+
+	if key == "is_open":
+		if door.is_locked and not is_gm:
+			return
+	elif key == "is_locked":
+		if not is_gm:
+			return
+	elif key in ["is_secret", "label", "lock_difficulty"]:
+		if not is_gm:
+			return
+	else:
+		return
+
+	door.apply_state(key, value)
+	rpc("receive_door_state", door_id, key, value)
+	_persist_doors_to_scene()
+
+@rpc("authority", "call_remote", "reliable")
+func receive_door_state(door_id: String, key: String, value):
+	var door = doors_by_id.get(door_id)
+	if door and is_instance_valid(door):
+		door.apply_state(key, value)
+
+@rpc("any_peer", "call_remote", "reliable")
+func request_lockpick_success(door_id: String):
+	if not multiplayer.is_server():
+		return
+	var door = doors_by_id.get(door_id)
+	if not door or not is_instance_valid(door):
+		return
+
+	door.apply_state("is_locked", false)
+	door.apply_state("is_open", true)
+	rpc("receive_door_state", door_id, "is_locked", false)
+	rpc("receive_door_state", door_id, "is_open", true)
+	_persist_doors_to_scene()
+
+@rpc("any_peer", "call_remote", "reliable")
+func request_door_delete(door_id: String):
+	if not multiplayer.is_server():
+		return
+	var sender_id = multiplayer.get_remote_sender_id()
+	if not _sender_is_gm(sender_id):
+		return
+	var door = doors_by_id.get(door_id)
+	if not door or not is_instance_valid(door):
+		return
+
+	doors_by_id.erase(door_id)
+	door.queue_free()
+	rpc("receive_door_delete", door_id)
+	_persist_doors_to_scene()
+
+@rpc("authority", "call_remote", "reliable")
+func receive_door_delete(door_id: String):
+	var door = doors_by_id.get(door_id)
+	if door and is_instance_valid(door):
+		doors_by_id.erase(door_id)
+		door.queue_free()
+
+# --- DOOR LOCKPICKING ---
+func _get_player_dex_modifier() -> int:
+	var token = _get_player_token(GameState.player_name)
+	if token == null:
+		return 0
+
+	var raw = token.data.get("dex_mod", null)
+	if raw != null:
+		if typeof(raw) == TYPE_INT or typeof(raw) == TYPE_FLOAT:
+			return int(raw)
+		if typeof(raw) == TYPE_STRING and str(raw).is_valid_int():
+			return int(str(raw))
+
+	raw = token.data.get("dex", token.data.get("dexterity", 10))
+	var score = 10
+	if typeof(raw) == TYPE_INT or typeof(raw) == TYPE_FLOAT:
+		score = int(raw)
+	elif typeof(raw) == TYPE_STRING and str(raw).is_valid_int():
+		score = int(str(raw))
+
+	return floori((score - 10) / 2.0)
+
+func _start_door_lockpick(door):
+	if not is_instance_valid(door):
+		return
+
+	var dex_mod = _get_player_dex_modifier()
+	var difficulty = int(door.lock_difficulty)
+	var minigame = preload("res://UI/Minigames/TumblerMinigame.tscn").instantiate()
+	minigame.initialize(clampi(dex_mod - difficulty, -5, 10), 30)
+	$UILayer.add_child(minigame)
+	minigame.set_anchors_preset(Control.PRESET_CENTER)
+
+	minigame.minigame_finished.connect(func(success: bool):
+		if not success:
+			return
+		if not is_instance_valid(door):
+			return
+		if multiplayer.is_server():
+			door.apply_state("is_locked", false)
+			door.apply_state("is_open", true)
+			rpc("receive_door_state", door.door_id, "is_locked", false)
+			rpc("receive_door_state", door.door_id, "is_open", true)
+			_persist_doors_to_scene()
+		else:
+			rpc_id(1, "request_lockpick_success", door.door_id)
+	)
+
+# ==========================================
+# LOOTING SYSTEM
+# ==========================================
+func _setup_loot_window():
+	loot_window = LOOT_WINDOW_SCENE.instantiate()
+	$UILayer.add_child(loot_window)
+	loot_window.visible = false
+
+	loot_window.anchor_left = 0.5
+	loot_window.anchor_top = 0.5
+	loot_window.anchor_right = 0.5
+	loot_window.anchor_bottom = 0.5
+	loot_window.offset_left = -230.0
+	loot_window.offset_top = -270.0
+	loot_window.offset_right = 230.0
+	loot_window.offset_bottom = 270.0
+
+	loot_window.close_requested.connect(_close_loot_window)
+	loot_window.take_requested.connect(_on_loot_take_requested)
+	loot_window.add_item_requested.connect(_on_loot_add_item_requested)
+	loot_window.unmark_requested.connect(_on_loot_unmark_requested)
+
+func _close_loot_window():
+	active_loot_container_id = ""
+	if loot_window:
+		loot_window.visible = false
+
+func _get_loot_container(container_id: String) -> Dictionary:
+	var containers = CampaignManager.campaign_data.get("loot_containers", {})
+	if typeof(containers) != TYPE_DICTIONARY:
+		containers = {}
+		CampaignManager.campaign_data["loot_containers"] = containers
+
+	if not containers.has(container_id):
+		containers[container_id] = {"name": container_id, "items": [], "token_name": ""}
+
+	var container = containers[container_id]
+	if typeof(container) != TYPE_DICTIONARY:
+		container = {"name": container_id, "items": [], "token_name": ""}
+		containers[container_id] = container
+	if typeof(container.get("items", [])) != TYPE_ARRAY:
+		container["items"] = []
+	return container
+
+func _create_loot_container(container_id: String, display_name: String, token_name: String) -> Dictionary:
+	var container = _get_loot_container(container_id)
+	container["name"] = display_name
+	container["token_name"] = token_name
+	if typeof(container.get("items", [])) != TYPE_ARRAY:
+		container["items"] = []
+	return container
+
+func _find_loot_token(container_id: String):
+	for token in token_layer.get_children():
+		if not ("data" in token):
+			continue
+		if str(token.data.get("container_id", "")) == container_id:
+			return token
+	return null
+
+func _get_backpack_key_for_player(player_name: String) -> String:
+	var token = _get_player_token(player_name)
+	if token and "data" in token:
+		var owner_id = str(token.data.get("owner_id", ""))
+		if owner_id != "":
+			return owner_id
+	return player_name
+
+func _find_loot_item_index(items: Array, item_id: String) -> int:
+	for i in range(items.size()):
+		if typeof(items[i]) == TYPE_DICTIONARY:
+			if str(items[i].get("id", "")) == item_id:
+				return i
+	return -1
+
+func _add_to_backpack(backpack_key: String, item: Dictionary):
+	var backpacks = CampaignManager.campaign_data.get("backpacks", {})
+	if typeof(backpacks) != TYPE_DICTIONARY:
+		backpacks = {}
+		CampaignManager.campaign_data["backpacks"] = backpacks
+
+	var backpack = backpacks.get(backpack_key, [])
+	if typeof(backpack) != TYPE_ARRAY:
+		backpack = []
+
+	var item_name = str(item.get("name", "Unknown Item"))
+	var item_desc = str(item.get("desc", ""))
+	var item_qty = max(1, int(item.get("qty", 1)))
+
+	# Merge identical items so a stack of 5 potions doesn't become 5 rows.
+	for existing in backpack:
+		if typeof(existing) != TYPE_DICTIONARY:
+			continue
+		if str(existing.get("name", "")) == item_name and str(existing.get("desc", "")) == item_desc:
+			existing["qty"] = int(existing.get("qty", 1)) + item_qty
+			backpacks[backpack_key] = backpack
+			rpc("sync_single_backpack", backpack_key, backpack)
+			sync_single_backpack(backpack_key, backpack)
+			return
+
+	var new_item = {
+		"id": "item_" + str(Time.get_ticks_msec()) + "_" + str(randi() % 10000),
+		"name": item_name,
+		"desc": item_desc,
+		"qty": item_qty
+	}
+	backpack.append(new_item)
+	backpacks[backpack_key] = backpack
+	rpc("sync_single_backpack", backpack_key, backpack)
+	sync_single_backpack(backpack_key, backpack)
+
+func _broadcast_loot_container(container_id: String):
+	var data = _get_loot_container(container_id).duplicate(true)
+	rpc("sync_loot_container", container_id, data)
+	sync_loot_container(container_id, data)
+
+func _add_item_to_loot_container(container_id: String, item_name: String, item_desc: String, quantity: int):
+	var container = _get_loot_container(container_id)
+	var items = container.get("items", [])
+	if typeof(items) != TYPE_ARRAY:
+		items = []
+
+	items.append({
+		"id": "loot_" + str(Time.get_ticks_msec()) + "_" + str(randi() % 10000),
+		"name": item_name,
+		"desc": item_desc,
+		"qty": clampi(quantity, 1, 999)
+	})
+	container["items"] = items
+	_broadcast_loot_container(container_id)
+
+func _server_take_loot_item(container_id: String, item_id: String, sender_id: int):
+	var container = _get_loot_container(container_id)
+	var items = container.get("items", [])
+	if typeof(items) != TYPE_ARRAY:
+		return
+
+	var index = _find_loot_item_index(items, item_id)
+	if index < 0:
+		return
+
+	var is_gm = _sender_is_gm(sender_id)
+	var player_name = _sender_player_name(sender_id)
+	if not is_gm and player_name == "":
+		return
+
+	if not is_gm:
+		var backpack_key = _get_backpack_key_for_player(player_name)
+		var taken_item = items[index].duplicate(true)
+		_add_to_backpack(backpack_key, taken_item)
+
+	items.remove_at(index)
+	container["items"] = items
+	_broadcast_loot_container(container_id)
+
+func _sender_player_name(peer_id: int) -> String:
+	if peer_id == 1:
+		return GameState.player_name if GameState.player_name != "" else "GM"
+	if connected_players.has(peer_id):
+		return str(connected_players[peer_id].get("name", ""))
+	return ""
+
+func open_loot_for_token(token_name: String):
+	var token = token_layer.get_node_or_null(token_name)
+	if token == null or not ("data" in token):
+		return
+
+	var is_lootable = bool(token.data.get("is_lootable", false))
+	if not is_lootable:
+		if not GameState.is_gm_mode:
+			return
+		broadcast_token_data_update(token.name, "is_lootable", true)
+		broadcast_token_data_update(token.name, "container_id", token.name)
+		token.data["container_id"] = token.name
+
+	var container_id = str(token.data.get("container_id", ""))
+	if container_id == "":
+		container_id = token.name
+		broadcast_token_data_update(token.name, "container_id", container_id)
+
+	var display_name = str(token.data.get("name", container_id))
+	var container = _create_loot_container(container_id, display_name, token.name)
+	active_loot_container_id = container_id
+
+	loot_window.populate(container_id, container.duplicate(true), GameState.is_gm_mode)
+	loot_window.visible = true
+	loot_window.move_to_front()
+
+	# Clients only have a partial copy of the campaign state. Pull the real
+	# container contents from the host.
+	if not multiplayer.is_server():
+		rpc_id(1, "request_loot_container", container_id)
+
+func _on_loot_take_requested(item_id: String):
+	if active_loot_container_id == "":
+		return
+
+	if multiplayer.is_server():
+		_server_take_loot_item(active_loot_container_id, item_id, 1)
+	else:
+		rpc_id(1, "request_loot_take", active_loot_container_id, item_id)
+
+func _on_loot_add_item_requested(item_name: String, item_desc: String, quantity: int):
+	if active_loot_container_id == "" or not GameState.is_gm_mode:
+		return
+
+	var clean_name = item_name.strip_edges()
+	var clean_desc = item_desc.strip_edges()
+	if clean_name == "":
+		return
+
+	if multiplayer.is_server():
+		_add_item_to_loot_container(active_loot_container_id, clean_name, clean_desc, quantity)
+	else:
+		rpc_id(1, "request_loot_add", active_loot_container_id, clean_name, clean_desc, quantity)
+
+func _on_loot_unmark_requested():
+	if not GameState.is_gm_mode or active_loot_container_id == "":
+		return
+
+	var container_id = active_loot_container_id
+	if multiplayer.is_server():
+		_server_unmark_loot(container_id)
+	else:
+		rpc_id(1, "request_loot_unmark", container_id)
+		_close_loot_window()
+
+func _server_unmark_loot(container_id: String):
+	var token = _find_loot_token(container_id)
+	if token:
+		broadcast_token_data_update(token.name, "is_lootable", false)
+		broadcast_token_data_update(token.name, "container_id", "")
+
+	rpc("receive_loot_unmarked", container_id)
+	receive_loot_unmarked(container_id)
+
+@rpc("authority", "call_remote", "reliable")
+func receive_loot_unmarked(container_id: String):
+	if active_loot_container_id == container_id:
+		_close_loot_window()
+
+@rpc("any_peer", "call_remote", "reliable")
+func request_loot_container(container_id: String):
+	if not multiplayer.is_server():
+		return
+	var sender_id = multiplayer.get_remote_sender_id()
+	var data = _get_loot_container(container_id).duplicate(true)
+	rpc_id(sender_id, "receive_loot_container", container_id, data)
+
+@rpc("authority", "call_remote", "reliable")
+func receive_loot_container(container_id: String, data: Dictionary):
+	sync_loot_container(container_id, data)
+
+@rpc("any_peer", "call_remote", "reliable")
+func request_loot_take(container_id: String, item_id: String):
+	if not multiplayer.is_server():
+		return
+	var sender_id = multiplayer.get_remote_sender_id()
+	_server_take_loot_item(container_id, item_id, sender_id)
+
+@rpc("any_peer", "call_remote", "reliable")
+func request_loot_add(container_id: String, item_name: String, item_desc: String, quantity: int):
+	if not multiplayer.is_server():
+		return
+	var sender_id = multiplayer.get_remote_sender_id()
+	if not _sender_is_gm(sender_id):
+		return
+	_add_item_to_loot_container(container_id, item_name, item_desc, quantity)
+
+@rpc("any_peer", "call_remote", "reliable")
+func request_loot_unmark(container_id: String):
+	if not multiplayer.is_server():
+		return
+	var sender_id = multiplayer.get_remote_sender_id()
+	if not _sender_is_gm(sender_id):
+		return
+	_server_unmark_loot(container_id)
+
+@rpc("authority", "call_remote", "reliable")
+func sync_loot_container(container_id: String, data: Dictionary):
+	var containers = CampaignManager.campaign_data.get("loot_containers", {})
+	if typeof(containers) != TYPE_DICTIONARY:
+		containers = {}
+		CampaignManager.campaign_data["loot_containers"] = containers
+
+	containers[container_id] = data
+	if active_loot_container_id == container_id and loot_window and loot_window.visible:
+		loot_window.populate(container_id, data, GameState.is_gm_mode)
 
 # --- CHARACTER SHEET TRIGGER ---
 func open_character_sheet_for_token(token_name: String):

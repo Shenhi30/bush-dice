@@ -53,6 +53,7 @@ var campaign_data: Dictionary = {
 	"system_id": "dnd_5e", # Track which system is active
 	"quests": [],
 	"backpacks": {},
+	"loot_containers": {},
 	"pc_vault": {},
 	"sheet_template": {}, 
 	"active_scene_id": "default_map", 

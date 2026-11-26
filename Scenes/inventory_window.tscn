@@ -3,17 +3,19 @@
 [ext_resource type="Script" uid="uid://ugqmh3e37g4n" path="res://Scripts/inventory_window.gd" id="1_hiai5"]
 [ext_resource type="StyleBox" uid="uid://bwqvnpqvn36dn" path="res://Themes/Main/Brown_box_flat.tres" id="1_xju2a"]
 [ext_resource type="Theme" uid="uid://d4megw80kf305" path="res://Themes/SpiBoxes/SpinBoxBG.tres" id="3_82ng6"]
+[ext_resource type="Theme" path="res://Themes/Main/WoodButtonCompact.tres" id="4_wood"]
 
 [node name="InventoryWindow" type="Panel" unique_id=2073021464]
 offset_right = 400.0
 offset_bottom = 500.0
 theme_override_styles/panel = ExtResource("1_xju2a")
+theme = ExtResource("4_wood")
 script = ExtResource("1_hiai5")
 
 [node name="TitleLabel" type="Label" parent="." unique_id=1891189478]
 layout_mode = 0
-offset_right = 40.0
-offset_bottom = 23.0
+offset_right = 384.0
+offset_bottom = 30.0
 mouse_filter = 0
 text = "Inventory"
 
@@ -28,9 +30,7 @@ offset_left = -48.0
 offset_top = -31.0
 grow_horizontal = 0
 grow_vertical = 0
-theme = ExtResource("3_82ng6")
 text = "close"
-flat = true
 
 [node name="ScrollContainer" type="ScrollContainer" parent="." unique_id=982997949]
 layout_mode = 1
@@ -68,6 +68,4 @@ placeholder_text = "Item Desc/Stats"
 
 [node name="AddItemBtn" type="Button" parent="HBoxContainer" unique_id=1831914840]
 layout_mode = 2
-theme = ExtResource("3_82ng6")
 text = "Add"
-flat = true

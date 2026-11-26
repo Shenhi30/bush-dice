@@ -17,6 +17,8 @@ var data: Dictionary = {
 	"status_color": "c45500b2", 
 	"light_radius": 0.0,
 	"current_init": 0, # Used universally by the Initiative Tracker
+	"is_lootable": false,
+	"container_id": "",
 	
 	# --- UNIVERSAL RESOURCES ---
 	"hp": 20,
@@ -69,6 +71,7 @@ var drag_start_pos: Vector2 = Vector2.ZERO
 @onready var delete_btn = $UI/MenuLayer/TokenMenu/MainMenu/DeleteBtn
 @onready var inv_btn = $UI/MenuLayer/TokenMenu/MainMenu/InvBtn
 @onready var sheet_btn = $UI/MenuLayer/TokenMenu/MainMenu/SheetBtn
+@onready var loot_btn = $UI/MenuLayer/TokenMenu/MainMenu/LootBtn
 
 @onready var hp_action_menu = $UI/MenuLayer/TokenMenu/HPActionMenu
 @onready var amount_spinbox = $UI/MenuLayer/TokenMenu/HPActionMenu/AmountSpinBox
@@ -219,6 +222,11 @@ func update_data(key: String, new_value, is_from_network: bool = false):
 	elif key == "is_status_active" or key == "status_color":
 		update_visuals()
 
+	elif key == "is_lootable" or key == "container_id":
+		queue_redraw()
+		if is_node_ready() and token_menu and token_menu.visible:
+			update_radial_menu()
+
 	elif key == "light_radius":
 		if new_value <= 0:
 			vision_light.energy = 0.0
@@ -298,6 +306,7 @@ func _setup_menu_signals():
 	delete_btn.pressed.connect(_on_delete_btn_pressed)
 	inv_btn.pressed.connect(_on_inv_btn_pressed)
 	sheet_btn.pressed.connect(_on_sheet_btn_pressed)
+	loot_btn.pressed.connect(_on_loot_btn_pressed)
 	
 	state_btn.pressed.connect(_on_state_toggle_pressed)
 	
@@ -341,6 +350,15 @@ func update_radial_menu():
 	# 1. Update the Global Array so the rest of the script knows what buttons exist!
 	current_main_btns = [hp_main_btn, status_btn, aura_btn, light_btn, edit_btn, state_btn, delete_btn, inv_btn, sheet_btn]
 	hide_btn.visible = false 
+	
+	# --- LOOTING ---
+	# Players only see the Loot button on containers the GM marked. The GM
+	# always sees it so they can turn any token into a loot container.
+	var can_loot = bool(data.get("is_lootable", false)) or GameState.is_gm_mode
+	loot_btn.visible = can_loot
+	loot_btn.text = "Loot" if bool(data.get("is_lootable", false)) else "Make Loot"
+	if can_loot:
+		current_main_btns.append(loot_btn)
 	
 	if GameState.is_gm_mode:
 		current_main_btns.append(hide_btn)
@@ -471,6 +489,22 @@ func _draw():
 	if current_aura_radius > 0:
 		draw_circle(Vector2.ZERO, current_aura_radius, current_aura_color)
 
+	# A little gold "loot" badge above the top-left corner of the token.
+	if data.get("is_lootable", false):
+		var token_extent = (grid_size_in_squares * base_cell_size) / 2.0
+		var badge_pos = Vector2(-token_extent - 8.0, -token_extent - 8.0)
+		draw_circle(badge_pos, 10.0, Color(0.12, 0.08, 0.02, 0.95))
+		draw_circle(badge_pos, 8.0, Color(0.95, 0.78, 0.2))
+		draw_string(
+			ThemeDB.fallback_font,
+			badge_pos + Vector2(-4.5, 4.5),
+			"L",
+			HORIZONTAL_ALIGNMENT_LEFT,
+			-1,
+			12,
+			Color(0.2, 0.12, 0.02)
+		)
+
 func _on_aura_radius_changed(value: float):
 	current_aura_radius = (value / 5.0) * base_cell_size
 	queue_redraw() 
@@ -571,6 +605,13 @@ func _on_sheet_btn_pressed():
 	var main_board = get_node_or_null("../../")
 	if main_board and main_board.has_method("open_character_sheet_for_token"):
 		main_board.open_character_sheet_for_token(name)
+
+func _on_loot_btn_pressed():
+	token_menu.hide()
+	
+	var main_board = get_node_or_null("../../")
+	if main_board and main_board.has_method("open_loot_for_token"):
+		main_board.open_loot_for_token(name)
 
 # --- RESIZE LOGIC ---
 func _on_resize_handle_input(event):

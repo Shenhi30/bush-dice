@@ -1,5 +1,7 @@
 extends PanelContainer # Or Window, depending on your root
 
+const WindowDrag = preload("res://Scripts/window_drag.gd")
+
 @onready var tab_container = $MarginContainer/VBoxContainer/TabContainer
 @onready var title_label = $MarginContainer/VBoxContainer/HBoxContainer/TitleLabel
 @onready var add_stat_btn = $MarginContainer/VBoxContainer/HBoxContainer/AddStatBtn
@@ -42,12 +44,8 @@ var current_token_name: String = ""
 # --- SYSTEM TRACKING ---
 var current_dice_logic: String = "d20_high" # Default fallback
 
-# Dragging variables
-var dragging: bool = false
-var drag_offset: Vector2 = Vector2.ZERO
-
 func _ready():
-	title_label.gui_input.connect(_on_title_gui_input)
+	WindowDrag.attach(title_label, self)
 	CampaignManager.blueprint_updated.connect(_on_blueprint_updated)
 	add_stat_btn.pressed.connect(_on_add_stat_btn_pressed)
 	
@@ -95,20 +93,6 @@ func _ready():
 	)
 	
 	generate_ui(CampaignManager.campaign_data.get("sheet_template", {}), {})
-
-# --- DRAGGING LOGIC ---
-
-func _on_title_gui_input(event: InputEvent):
-	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
-		if event.pressed:
-			dragging = true
-			drag_offset = get_global_mouse_position() - global_position
-		else:
-			dragging = false
-			
-	elif event is InputEventMouseMotion and dragging:
-		global_position = get_global_mouse_position() - drag_offset
-
 
 # --- UI GENERATION ---
 
@@ -798,7 +782,7 @@ func _draw_spell_book(container: Control, max_level: int):
 			# 2. Кількість Кубиків
 			var count_spin = SpinBox.new()
 			count_spin.min_value = 0
-			count_spin.max_value = 99
+			count_spin.max_value = 9999
 			count_spin.value = spell.get("dice_count", 0)
 			count_spin.custom_minimum_size.x = 55
 			count_spin.alignment = HORIZONTAL_ALIGNMENT_CENTER

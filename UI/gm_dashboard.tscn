@@ -3,6 +3,8 @@
 [ext_resource type="Script" uid="uid://s8h7e6g1q2ff" path="res://Scripts/GMDashboard.gd" id="1_rj5mt"]
 [ext_resource type="ButtonGroup" uid="uid://plv3shyiyxe3" path="res://ButtonGroups/Dashboard/ToolBtn.tres" id="2_qgoge"]
 [ext_resource type="PackedScene" uid="uid://bmcixwf6kn5dp" path="res://UI/TokenLibraryItem.tscn" id="3_sn0hj"]
+[ext_resource type="Theme" path="res://Themes/Main/WoodButtonCompact.tres" id="4_wood"]
+[ext_resource type="Theme" path="res://Themes/Main/WoodButtonBar.tres" id="5_bar"]
 
 [node name="GMDashboard" type="CanvasLayer" unique_id=1538053333]
 script = ExtResource("1_rj5mt")
@@ -10,6 +12,7 @@ script = ExtResource("1_rj5mt")
 [node name="HBoxContainer" type="HBoxContainer" parent="." unique_id=914772494]
 offset_right = 1229.0
 offset_bottom = 31.0
+theme = ExtResource("5_bar")
 
 [node name="ToggleMapsBtn" type="Button" parent="HBoxContainer" unique_id=652971019]
 layout_mode = 2
@@ -115,6 +118,7 @@ offset_top = -284.0
 offset_right = 60.0
 offset_bottom = 324.0
 grow_vertical = 2
+theme = ExtResource("4_wood")
 
 [node name="TabContainer" type="TabContainer" parent="ToolPallete" unique_id=1890078958]
 layout_mode = 2
@@ -222,6 +226,7 @@ layout_mode = 2
 
 [node name="TopControls" type="HBoxContainer" parent="MapDrawer/VBoxContainer" unique_id=1349321181]
 layout_mode = 2
+theme = ExtResource("4_wood")
 
 [node name="ImportMapBtn" type="Button" parent="MapDrawer/VBoxContainer/TopControls" unique_id=1957454182]
 layout_mode = 2
@@ -251,6 +256,7 @@ layout_mode = 2
 
 [node name="TopControls" type="HBoxContainer" parent="TokenDrawer/VBoxContainer" unique_id=935915182]
 layout_mode = 2
+theme = ExtResource("4_wood")
 
 [node name="ImportTokenBtn" type="Button" parent="TokenDrawer/VBoxContainer/TopControls" unique_id=148786769]
 layout_mode = 2

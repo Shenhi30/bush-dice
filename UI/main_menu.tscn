@@ -1,7 +1,11 @@
 [gd_scene format=3 uid="uid://dumt7s8nlqnjf"]
 
 [ext_resource type="Script" uid="uid://bxm3g1gt4ul3x" path="res://Scripts/MainMenu.gd" id="1_p8ccj"]
-[ext_resource type="Theme" uid="uid://d4megw80kf305" path="res://Themes/SpiBoxes/SpinBoxBG.tres" id="2_tk8dj"]
+[ext_resource type="Texture2D" uid="uid://dwvvtherrifl6" path="res://Assets/Backgrounds/main_menu_bg.jpg" id="3_bg"]
+[ext_resource type="Theme" uid="uid://d7jj6gkot5yo" path="res://Themes/Main/WoodButton.tres" id="4_wood"]
+[ext_resource type="Theme" uid="uid://db5a3708dwskn" path="res://Themes/Main/WoodLabel.tres" id="5_label"]
+[ext_resource type="Theme" path="res://Themes/Main/WoodInput.tres" id="6_input"]
+[ext_resource type="Theme" path="res://Themes/Main/WoodText.tres" id="7_text"]
 
 [node name="MainMenu" type="Control" unique_id=777171733]
 layout_mode = 3
@@ -19,6 +23,20 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("3_bg")
+expand_mode = 1
+stretch_mode = 6
+
+[node name="BackgroundShade" type="ColorRect" parent="." unique_id=1196633523]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.015, 0.035, 0.045, 0.32)
 
 [node name="CenterContainer" type="CenterContainer" parent="." unique_id=1698054845]
 layout_mode = 1
@@ -30,18 +48,26 @@ grow_vertical = 2
 
 [node name="VBoxContainer" type="VBoxContainer" parent="CenterContainer" unique_id=1160955503]
 layout_mode = 2
+theme = ExtResource("4_wood")
 
 [node name="TitleLabel" type="Label" parent="CenterContainer/VBoxContainer" unique_id=1996377064]
 layout_mode = 2
-theme = ExtResource("2_tk8dj")
+size_flags_horizontal = 4
+theme = ExtResource("5_label")
+theme_override_font_sizes/font_size = 30
 text = "Bush Dice"
 horizontal_alignment = 1
 
 [node name="WelcomeLabel" type="Label" parent="CenterContainer/VBoxContainer" unique_id=659271694]
 layout_mode = 2
+size_flags_horizontal = 4
+theme = ExtResource("5_label")
+theme_override_font_sizes/font_size = 16
+horizontal_alignment = 1
 
 [node name="IPInput" type="LineEdit" parent="CenterContainer/VBoxContainer" unique_id=1712597953]
 layout_mode = 2
+theme = ExtResource("6_input")
 placeholder_text = "Ip"
 
 [node name="HostButton" type="Button" parent="CenterContainer/VBoxContainer" unique_id=1341657758]
@@ -58,6 +84,7 @@ text = "Join Ip"
 
 [node name="ChangeNameInput" type="LineEdit" parent="CenterContainer/VBoxContainer" unique_id=137738310]
 layout_mode = 2
+theme = ExtResource("6_input")
 placeholder_text = "New Name"
 alignment = 1
 
@@ -67,9 +94,12 @@ text = "Change Name"
 
 [node name="SettingsFeedbackLabel" type="Label" parent="CenterContainer/VBoxContainer" unique_id=168233937]
 layout_mode = 2
+theme = ExtResource("7_text")
 
 [node name="HotkeysLabel" type="Label" parent="CenterContainer/VBoxContainer" unique_id=2049829437]
 layout_mode = 2
+theme = ExtResource("5_label")
+theme_override_font_sizes/font_size = 14
 text = "Press x - change token to enemy/neutral/ally
 SHIFT + LMB to select multiple tokens
 Press + or - to change token size
@@ -78,8 +108,7 @@ Press H to hide DELETE to delete Q to damage all selected
 
 ALT+LMB to Ping
 
-1, 2, 3, 4 - to change tools for GM; 1, 4(ruller) work for player. 
-"
+1, 2, 3, 4 - to change tools for GM; 1, 4(ruller) work for player. "
 
 [node name="LoadCampaignDialog" type="FileDialog" parent="." unique_id=192650964]
 title = "Open a File"
@@ -94,11 +123,13 @@ anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -93.0
-offset_top = -49.0
+offset_left = -140.0
+offset_top = -44.25
 grow_horizontal = 0
 grow_vertical = 0
+theme = ExtResource("5_label")
+theme_override_font_sizes/font_size = 14
 text = "version 0.40
 "
 horizontal_alignment = 1
-vertical_alignment = 2
+vertical_alignment = 1

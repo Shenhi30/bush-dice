@@ -1,0 +1,57 @@
+[gd_resource type="Theme" format=3 uid="uid://vonukxorhrgm"]
+
+[ext_resource type="Texture2D" uid="uid://jhkkc418j1o8" path="res://Assets/UI/wood_button_normal.png" id="1_normal"]
+[ext_resource type="Texture2D" uid="uid://bfdtunydtt2ah" path="res://Assets/UI/wood_button_hover.png" id="2_focus"]
+[ext_resource type="Texture2D" uid="uid://cq0ols0tvtclx" path="res://Assets/UI/wood_button_disabled.png" id="3_read_only"]
+[ext_resource type="FontFile" uid="uid://dvpkfb7dbepkm" path="res://Assets/Fonts/Roboto-VariableFont_wdth,wght.ttf" id="4_font"]
+
+[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_focus"]
+content_margin_left = 14.0
+content_margin_top = 7.0
+content_margin_right = 14.0
+content_margin_bottom = 7.0
+texture = ExtResource("2_focus")
+texture_margin_left = 18.0
+texture_margin_top = 9.0
+texture_margin_right = 18.0
+texture_margin_bottom = 9.0
+modulate_color = Color(0.82, 0.71, 0.55, 1)
+
+[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_normal"]
+content_margin_left = 14.0
+content_margin_top = 7.0
+content_margin_right = 14.0
+content_margin_bottom = 7.0
+texture = ExtResource("1_normal")
+texture_margin_left = 18.0
+texture_margin_top = 9.0
+texture_margin_right = 18.0
+texture_margin_bottom = 9.0
+modulate_color = Color(0.55, 0.47, 0.4, 1)
+
+[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_read_only"]
+content_margin_left = 14.0
+content_margin_top = 7.0
+content_margin_right = 14.0
+content_margin_bottom = 7.0
+texture = ExtResource("3_read_only")
+texture_margin_left = 18.0
+texture_margin_top = 9.0
+texture_margin_right = 18.0
+texture_margin_bottom = 9.0
+modulate_color = Color(0.5, 0.45, 0.4, 1)
+
+[resource]
+LineEdit/colors/caret_color = Color(1, 0.858824, 0.529412, 1)
+LineEdit/colors/font_color = Color(0.988235, 0.909804, 0.741176, 1)
+LineEdit/colors/font_outline_color = Color(0.117647, 0.0588235, 0.0196078, 0.9)
+LineEdit/colors/font_placeholder_color = Color(0.74902, 0.658824, 0.517647, 0.7)
+LineEdit/colors/font_selected_color = Color(1, 0.960784, 0.862745, 1)
+LineEdit/colors/font_uneditable_color = Color(0.658824, 0.6, 0.505882, 1)
+LineEdit/colors/selection_color = Color(0.552941, 0.352941, 0.121569, 0.8)
+LineEdit/constants/outline_size = 1
+LineEdit/font_sizes/font_size = 16
+LineEdit/fonts/font = ExtResource("4_font")
+LineEdit/styles/focus = SubResource("StyleBoxTexture_focus")
+LineEdit/styles/normal = SubResource("StyleBoxTexture_normal")
+LineEdit/styles/read_only = SubResource("StyleBoxTexture_read_only")

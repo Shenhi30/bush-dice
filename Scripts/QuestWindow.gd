@@ -1,13 +1,16 @@
 extends PanelContainer # Або Window
 
-@onready var quest_list = $HBoxContainer/LeftColumn/QuestList
-@onready var title_input = $HBoxContainer/RightColumn/QuestName
-@onready var desc_input = $HBoxContainer/RightColumn/QuestDesc
-@onready var pin_toggle = $HBoxContainer/RightColumn/PinCheckBox
+const WindowDrag = preload("res://Scripts/window_drag.gd")
 
-@onready var new_btn = $HBoxContainer/LeftColumn/NewQuestBtn
-@onready var save_btn = $HBoxContainer/RightColumn/SaveQuestBtn
-@onready var delete_btn = $HBoxContainer/RightColumn/DeleteQuestBtn
+@onready var quest_list = $VBoxContainer/HBoxContainer/LeftColumn/QuestList
+@onready var title_input = $VBoxContainer/HBoxContainer/RightColumn/QuestName
+@onready var desc_input = $VBoxContainer/HBoxContainer/RightColumn/QuestDesc
+@onready var pin_toggle = $VBoxContainer/HBoxContainer/RightColumn/PinCheckBox
+
+@onready var new_btn = $VBoxContainer/HBoxContainer/LeftColumn/NewQuestBtn
+@onready var save_btn = $VBoxContainer/HBoxContainer/RightColumn/SaveQuestBtn
+@onready var delete_btn = $VBoxContainer/HBoxContainer/RightColumn/DeleteQuestBtn
+@onready var close_btn = $VBoxContainer/Header/CloseBtn
 
 var active_quest_id: String = ""
 var current_quests: Dictionary = {}
@@ -16,9 +19,12 @@ func _ready():
 	# Додаємо це вікно до групи, щоб MainBoard міг його оновлювати
 	add_to_group("quest_ui")
 	
+	WindowDrag.attach($VBoxContainer/Header, self)
+	
 	new_btn.pressed.connect(_on_new_quest)
 	save_btn.pressed.connect(_on_save_quest)
 	delete_btn.pressed.connect(_on_delete_quest)
+	close_btn.pressed.connect(func(): hide())
 	quest_list.item_selected.connect(_on_quest_selected)
 	
 	refresh_quests() # Завантажуємо при відкритті

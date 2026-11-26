@@ -18,6 +18,10 @@ var is_row_selection: bool = true
 var active_line_index: int = 0    
 var clicked_buttons = []          
 
+var stat_mod_cache: int = 2
+var time_limit_cache: int = 30
+var initialized_from_code: bool = false
+
 var word_pool = [
 	"BOOT", "BYTE", "BASE", "BURN", "BAIT", "BASH", "BIND", "BULK",
 	"CORE", "CODE", "CHIP", "CLIP", "COLD", "CALL", "CAST", "CELL",
@@ -37,24 +41,35 @@ var word_pool = [
 ]
 
 func _ready():
-	if get_parent() == get_tree().root:
-		initialize(0, 25) 
+	if get_parent() == get_tree().root and not initialized_from_code:
+		initialize(2, 45) 
+	else:
+		_setup_puzzle_logic(stat_mod_cache, time_limit_cache)
 
 # --- INITIALIZED FROM MAINBOARD ---
 func initialize(stat_modifier: int, time_limit: int = 30):
-	time_left = float(time_limit)
-	timer_bar.max_value = time_left
-	timer_bar.value = time_left
+	stat_mod_cache = stat_modifier
+	time_limit_cache = time_limit
+	initialized_from_code = true
 	
-	# Starts at 12x12. Every +1 INT shrinks the grid by 1 row/column.
+	if is_inside_tree():
+		_setup_puzzle_logic(stat_mod_cache, time_limit_cache)
+
+func _setup_puzzle_logic(stat_modifier: int, time_limit: int):
+	time_left = float(time_limit)
+	if timer_bar:
+		timer_bar.max_value = time_left
+		timer_bar.value = time_left
+	
 	var grid_size = clampi(12 - stat_modifier, 4, 12)
-	word_grid.columns = grid_size
+	if word_grid:
+		word_grid.columns = grid_size
 	var total_cells = grid_size * grid_size
 	
-	# Password length: Up to 6 words for a massive grid, down to 2 for high stats
 	max_words = clampi(6 - int(stat_modifier / 2.0), 2, 6)
 	
 	_generate_puzzle(total_cells)
+	_print_figma_dimensions()
 
 func _generate_puzzle(total_cells: int):
 	randomize()
@@ -113,21 +128,16 @@ func _generate_puzzle(total_cells: int):
 		is_placing_in_row = not is_placing_in_row
 
 	# ==========================================
-	# FILL REMAINDER WITH DECOYS
+	# FILL REMAINDER WITH CAMOUFLAGE DECOYS
 	# ==========================================
 	for i in range(total_cells):
 		if grid_words[i] == "":
-			# 60% chance for an exact duplicate (to create false branching paths)
-			if randf() < 0.60:
+			if randf() < 0.30:
 				grid_words[i] = target_sequence.pick_random()
 			else:
-				# 40% chance for a CAMOUFLAGE word (same first letter, same length)
 				var mimic_target = target_sequence.pick_random()
 				grid_words[i] = _get_camouflage_word(mimic_target)
-	# ==========================================
-	# DYNAMIC BUTTON SCALING & SPAWNING
-	# ==========================================
-		# Shrink buttons if the grid is massive so it fits on screen
+			
 	var btn_width = 55
 	var btn_height = 35
 	var font_size = 12
@@ -152,6 +162,16 @@ func _generate_puzzle(total_cells: int):
 		
 	_update_grid_visuals()
 
+
+func _get_camouflage_word(target: String) -> String:
+	var matches = []
+	for w in word_pool:
+		if w != target and w[0] == target[0]:
+			matches.append(w)
+	if matches.size() > 0:
+		return matches.pick_random()
+	return word_pool.pick_random()
+
 func _update_grid_visuals():
 	for i in range(word_grid.get_child_count()):
 		var btn = word_grid.get_child(i)
@@ -172,28 +192,16 @@ func _update_grid_visuals():
 		btn.disabled = not is_active
 		
 		if is_active:
-			btn.modulate = Color(0.2, 0.8, 1.0) # Cyberpunk Blue
+			btn.modulate = Color(0.3, 1.0, 0.4) 
 		else:
-			btn.modulate = Color(0.3, 0.3, 0.3) # Locked Dark Grey
-
-func _get_camouflage_word(target: String) -> String:
-	var matches = []
-	for w in word_pool:
-		# Find words with the same first letter, but not the exact same word
-		if w != target and w[0] == target[0]:
-			matches.append(w)
-			
-	if matches.size() > 0:
-		return matches.pick_random()
-		
-	# Fallback just in case
-	return word_pool.pick_random()
+			btn.modulate = Color(0.4, 0.4, 0.4) 
 
 func _process(delta):
 	if not minigame_active: return
 	
 	time_left -= delta
-	timer_bar.value = time_left
+	if timer_bar:
+		timer_bar.value = time_left
 	
 	if time_left <= 0:
 		_fail_minigame("TIME OUT! LOCKOUT TRIGGERED!")
@@ -203,7 +211,7 @@ func _on_word_clicked(btn: Button, word: String, col: int, row: int):
 	
 	current_attempt.append(word)
 	clicked_buttons.append(btn)
-	btn.modulate = Color(1.0, 0.8, 0.0) # Gold for selected
+	btn.modulate = Color(1.0, 0.6, 0.0) 
 	
 	attempt_label.text = "ATTEMPT: " + " - ".join(current_attempt)
 	
@@ -229,6 +237,8 @@ func _check_win_condition():
 		attempt_label.text = "ERROR! -5 SECONDS!"
 		attempt_label.add_theme_color_override("font_color", Color(1, 0, 0))
 		
+		_trigger_screen_shake()
+		
 		set_process(false) 
 		await get_tree().create_timer(1.0).timeout
 		set_process(true)
@@ -238,7 +248,6 @@ func _check_win_condition():
 			attempt_label.text = "ATTEMPT: "
 			current_attempt.clear()
 			
-			# Reset state on failure so the player can try again
 			clicked_buttons.clear()
 			is_row_selection = true
 			active_line_index = 0
@@ -258,7 +267,34 @@ func _fail_minigame(msg: String):
 	minigame_active = false
 	title_label.text = msg
 	title_label.add_theme_color_override("font_color", Color(1, 0, 0))
-	timer_bar.modulate = Color(0.2, 0.2, 0.2)
+	if timer_bar:
+		timer_bar.modulate = Color(0.2, 0.2, 0.2)
 	
 	await get_tree().create_timer(2.0).timeout
 	queue_free()
+
+
+func _trigger_screen_shake():
+	var tween = create_tween()
+	var margin_node = $MarginContainer
+	if not margin_node: return
+	var original_pos = margin_node.position
+	
+	for i in range(6):
+		var offset = Vector2(randf_range(-15.0, 15.0), randf_range(-15.0, 15.0))
+		tween.tween_property(margin_node, "position", original_pos + offset, 0.04)
+		
+	tween.tween_property(margin_node, "position", original_pos, 0.04)
+
+func _print_figma_dimensions():
+	await get_tree().process_frame
+	var panel_size = size
+	var button_size = Vector2.ZERO
+	
+	if word_grid.get_child_count() > 0:
+		button_size = word_grid.get_child(0).size
+		
+	print("========== FIGMA EXPORT DIMENSIONS ==========")
+	print("1. Create a Frame for the Main Panel: ", panel_size.x, "W x ", panel_size.y, "H")
+	print("2. Create a Frame for the Buttons: ", button_size.x, "W x ", button_size.y, "H")
+	print("=============================================")

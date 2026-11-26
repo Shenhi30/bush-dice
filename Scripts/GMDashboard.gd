@@ -64,6 +64,13 @@ var full_scene_list = {}
 @onready var btn_erase = $ToolPallete/TabContainer/Tools/EraseWallBtn
 @onready var btn_measure = $ToolPallete/TabContainer/Tools/MeasureToolBtn
 
+# --- DOOR TOOL (created in code so the scene file stays untouched) ---
+var btn_door: Button
+var door_locked_check: CheckBox
+var door_vertical_check: CheckBox
+var door_secret_check: CheckBox
+var door_lock_spin: SpinBox
+
 @onready var save_file_dialog = $SaveFileDialog
 @onready var load_file_dialog = $LoadFileDialog
 
@@ -213,6 +220,7 @@ func _ready():
 		# Hide it if a regular player somehow sees this dashboard
 		host_ip_btn.visible = false
 		
+	_setup_doors_panel()
 	_setup_minigames_panel()
 
 func _process(delta: float):
@@ -564,6 +572,7 @@ func update_tool_colors(active_mode: int):
 	if btn_draw: btn_draw.modulate = normal_color
 	if btn_erase: btn_erase.modulate = normal_color
 	if btn_measure: btn_measure.modulate = normal_color
+	if btn_door: btn_door.modulate = normal_color
 	
 	# 2. Apply the gold highlight to the active tool
 	match active_mode:
@@ -583,6 +592,10 @@ func update_tool_colors(active_mode: int):
 			if btn_measure: 
 				btn_measure.modulate = active_color
 				btn_measure.set_pressed_no_signal(true)
+		4: # PLACE DOOR
+			if btn_door:
+				btn_door.modulate = active_color
+				btn_door.set_pressed_no_signal(true)
 
 # --- KEYBOARD SHORTCUT RECEIVER ---
 func select_tool_by_index(mode_index: int):
@@ -596,6 +609,8 @@ func select_tool_by_index(mode_index: int):
 			if btn_erase: btn_erase.button_pressed = true
 		3: 
 			if btn_measure: btn_measure.button_pressed = true
+		4:
+			if btn_door: btn_door.button_pressed = true
 
 func refresh_toolpallete_lists():
 	# 1. Очищаємо стандартні списки
@@ -707,6 +722,71 @@ func _on_host_ip_btn_pressed():
 				host_ip_btn.text = original_text
 		)
 
+
+
+# ==========================================
+# DOOR TOOL PANEL
+# ==========================================
+func _setup_doors_panel():
+	var tools_tab = $ToolPallete/TabContainer/Tools
+	if not tools_tab: return
+
+	var sep = HSeparator.new()
+	sep.add_theme_constant_override("separation", 20)
+	tools_tab.add_child(sep)
+
+	var title = Label.new()
+	title.text = "--- DOORS ---"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_color_override("font_color", Color(0.8, 0.65, 0.35))
+	tools_tab.add_child(title)
+
+	var info = Label.new()
+	info.text = "Place doors on grid edges. Shift flips orientation, Ctrl places a locked door."
+	info.autowrap_mode = TextServer.AUTOWRAP_WORD
+	info.add_theme_color_override("font_color", Color(0.75, 0.75, 0.75))
+	tools_tab.add_child(info)
+
+	var config_row = HBoxContainer.new()
+	door_vertical_check = CheckBox.new()
+	door_vertical_check.text = "Vertical"
+	config_row.add_child(door_vertical_check)
+
+	door_locked_check = CheckBox.new()
+	door_locked_check.text = "Locked"
+	config_row.add_child(door_locked_check)
+
+	door_secret_check = CheckBox.new()
+	door_secret_check.text = "Secret"
+	config_row.add_child(door_secret_check)
+	tools_tab.add_child(config_row)
+
+	var dc_row = HBoxContainer.new()
+	var dc_label = Label.new()
+	dc_label.text = "Lock difficulty:"
+	dc_row.add_child(dc_label)
+
+	door_lock_spin = SpinBox.new()
+	door_lock_spin.min_value = 0
+	door_lock_spin.max_value = 20
+	door_lock_spin.value = 2
+	door_lock_spin.tooltip_text = "Subtracted from the lockpicker's DEX modifier."
+	door_lock_spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	dc_row.add_child(door_lock_spin)
+	tools_tab.add_child(dc_row)
+
+	btn_door = Button.new()
+	btn_door.text = "Place Door"
+	btn_door.toggle_mode = true
+	btn_door.tooltip_text = "Click the map to place a door. Shortcut: 5"
+	if btn_select and btn_select.button_group:
+		btn_door.button_group = btn_select.button_group
+	btn_door.toggled.connect(func(toggled_on: bool):
+		if toggled_on:
+			tool_mode_changed.emit(4)
+			update_tool_colors(4)
+	)
+	tools_tab.add_child(btn_door)
 
 
 # ==========================================
